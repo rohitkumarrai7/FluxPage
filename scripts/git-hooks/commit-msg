@@ -1,0 +1,10 @@
+#!/bin/sh
+# Reject Cursor co-author trailers (keeps GitHub contributors list clean).
+msg_file="$1"
+if grep -qiE 'co-authored-by:\s*cursor\s*<cursoragent@cursor\.com>' "$msg_file"; then
+  echo "ERROR: Removed Co-authored-by: Cursor from commit message." >&2
+  sed -i.bak '/^[Cc]o-[Aa]uthored-[Bb]y:\s*[Cc]ursor\s*<cursoragent@cursor\.com>\s*$/d' "$msg_file" 2>/dev/null \
+    || sed -i '' '/^[Cc]o-[Aa]uthored-[Bb]y:\s*[Cc]ursor\s*<cursoragent@cursor\.com>\s*$/d' "$msg_file" 2>/dev/null
+  rm -f "${msg_file}.bak" 2>/dev/null
+fi
+exit 0
