@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { assertCanUploadResume } from "./planLimits";
 
 export const upload = mutation({
   args: {
@@ -13,6 +14,8 @@ export const upload = mutation({
     label: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertCanUploadResume(ctx, args.userId);
+
     const resumes = await ctx.db
       .query("resumes")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))

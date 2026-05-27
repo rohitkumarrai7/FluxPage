@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { scoreResumeAgainstJD } from "./atsScoring";
 import { parseResumeText, buildSuggestions } from "./resumeParser";
+import { assertCanCreateTailor, incrementTailorUsage } from "./planLimits";
 
 const NON_SKILL_KW = new Set([
   "development", "ai-generated", "modern", "optimization", "improve",
@@ -205,6 +206,8 @@ export const create = mutation({
     resumeText: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertCanCreateTailor(ctx, args.userId);
+
     const activeDrafts = await ctx.db
       .query("drafts")
       .withIndex("by_user_status", (q) =>
@@ -277,6 +280,8 @@ export const create = mutation({
       suggestions: aiSuggestions.map((s) => s.suggestedText),
       optimizedKeywords: [...missingKw.slice(0, 8)].filter((kw) => !matchedKw.includes(kw)),
     };
+
+    await incrementTailorUsage(ctx, args.userId);
 
     const draftId = await ctx.db.insert("drafts", {
       userId: args.userId,

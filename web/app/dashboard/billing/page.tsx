@@ -14,13 +14,6 @@ type PaidTier = "pro" | "premium";
 
 const RAZORPAY_CONFIGURED = !!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
-function getWebhookUrl(): string {
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/api/razorpay/webhook`;
-  }
-  return "https://www.fluxpage.com/api/razorpay/webhook";
-}
-
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (window.Razorpay) {
@@ -178,29 +171,6 @@ export default function BillingPage() {
         onUpgrade={handleUpgrade}
         loadingTier={loadingTier}
       />
-
-      <Card className="mt-8 bg-sky-50 border-sky-200" padding="md">
-        <p className="text-sm text-sky-900">
-          {RAZORPAY_CONFIGURED ? (
-            <>
-              <strong>Razorpay checkout</strong> is enabled (INR). After payment, your plan tier updates
-              automatically. In the Razorpay dashboard, set the webhook URL to{" "}
-              <code className="text-xs break-all">{getWebhookUrl()}</code> and enable{" "}
-              <code className="text-xs">payment.captured</code>. Also set{" "}
-              <code className="text-xs">RAZORPAY_KEY_SECRET</code> and{" "}
-              <code className="text-xs">RAZORPAY_WEBHOOK_SECRET</code> on your host.
-            </>
-          ) : (
-            <>
-              <strong>Configure Razorpay keys</strong> on Vercel:{" "}
-              <code className="text-xs">NEXT_PUBLIC_RAZORPAY_KEY_ID</code> (live{" "}
-              <code className="text-xs">rzp_live_…</code>),{" "}
-              <code className="text-xs">RAZORPAY_KEY_SECRET</code>, and{" "}
-              <code className="text-xs">RAZORPAY_WEBHOOK_SECRET</code>.
-            </>
-          )}
-        </p>
-      </Card>
     </div>
   );
 }

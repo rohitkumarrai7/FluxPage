@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://canny-woodpecker-211.convex.site";
 
 const SYSTEM_PROMPT = `You are an expert cover letter writer. Generate a compelling, professional cover letter.
 
@@ -15,6 +16,24 @@ Rules:
 
 export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const profileRes = await fetch(`${API_URL}/v1/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        const tier = profile.tier || "free";
+        if (tier !== "pro" && tier !== "premium") {
+          return NextResponse.json(
+            { error: "Cover letters require a Pro or Premium plan." },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const body = await req.json();
     const { resumeText, jobDescription, jobTitle, company, tone } = body;
 

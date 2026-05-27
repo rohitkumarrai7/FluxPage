@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getLimits, getTailorsUsedThisMonth } from "./planLimits";
 
 function uint8ToHex(uint8: Uint8Array): string {
   return Array.from(uint8)
@@ -223,13 +224,14 @@ export const getProfile = query({
       )
       .collect();
 
-    const limits = {
-      free: { analyses: 5, compilations: 2, drafts: 2 },
-      pro: { analyses: 50, compilations: 20, drafts: 10 },
-      premium: { analyses: 999, compilations: 999, drafts: 50 },
-      team: { analyses: 999, compilations: 999, drafts: 50 },
-    };
-    const l = limits[user.tier as keyof typeof limits] || limits.free;
+    const plan = getLimits(user.tier);
+    const tailorsUsed = await getTailorsUsedThisMonth(ctx, user._id);
+    const resumeCount = (
+      await ctx.db
+        .query("resumes")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .collect()
+    ).length;
 
     return {
       id: user._id,
@@ -238,12 +240,17 @@ export const getProfile = query({
       tier: user.tier,
       onboardingCompleted: user.onboardingCompleted ?? false,
       usage: {
-        analysesThisMonth: user.analysesCount,
-        analysesLimit: l.analyses,
+        tailorsThisMonth: tailorsUsed,
+        tailorsLimit: plan.tailorsPerMonth,
+        resumesCount: resumeCount,
+        resumesLimit: plan.maxResumes,
+        coverLettersEnabled: plan.coverLetters,
+        analysesThisMonth: tailorsUsed,
+        analysesLimit: plan.tailorsPerMonth,
         compilationsThisMonth: user.compilationsCount,
-        compilationsLimit: l.compilations,
+        compilationsLimit: plan.tailorsPerMonth < 0 ? 999 : plan.tailorsPerMonth,
         draftsActive: activeDrafts.length,
-        draftsLimit: l.drafts,
+        draftsLimit: plan.tailorsPerMonth < 0 ? 999 : plan.tailorsPerMonth,
       },
     };
   },
