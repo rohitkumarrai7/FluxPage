@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=360" />
+  <title>Fluxpage</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup">
+    <div class="popup-header">
+      <div class="popup-logo">
+        <img src="../icons/logo-mark.svg" width="38" height="38" alt="Fluxpage" />
+      </div>
+      <div class="popup-title">
+        <div class="app-name">Fluxpage</div>
+        <div class="app-tagline">AI Job Assistant</div>
+      </div>
+    </div>
+
+    <div class="popup-body">
+      <div class="auth-section" id="authSection">
+        <div id="authInfo" class="auth-info"></div>
+        <button id="authBtn" class="btn btn-primary btn-sm"></button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="savedCount">0</div>
+          <div class="stat-label">Saved Jobs</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="lastScore">\u2014</div>
+          <div class="stat-label">Last ATS Score</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="resumeCount">0</div>
+          <div class="stat-label">Resumes</div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <button class="btn btn-outline full-width" id="openDashboard">Open Dashboard</button>
+        <div class="browse-row">
+          <button class="btn btn-outline browse-btn" id="openLinkedInJobs">LinkedIn</button>
+          <button class="btn btn-outline browse-btn" id="openInternshalaJobs">Internshala</button>
+          <button class="btn btn-outline browse-btn" id="openNaukriJobs">Naukri</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="popup-footer">
+      Fluxpage v2.0 &middot; <a href="https://www.fluxpage.com" id="webLink" target="_blank">fluxpage.com</a>
+    </div>
+  </div>
+  <script src="../config.generated.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
