@@ -6,11 +6,12 @@ import {
   isHumanReadableText,
   sanitizeResumeText,
 } from "@/lib/textValidation";
+import { CONVEX_HTTP_URL } from "@/lib/convexDeployment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://canny-woodpecker-211.convex.site";
+const API_URL = CONVEX_HTTP_URL;
 const LOCAL_PDF_API = process.env.LOCAL_PDF_API || "http://localhost:8000";
 
 function fileToBase64(buffer: ArrayBuffer): string {

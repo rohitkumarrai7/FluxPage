@@ -75,7 +75,14 @@ In the [Convex dashboard](https://dashboard.convex.dev) → **Settings → Envir
 | `WEB_BASE` | `https://www.fluxpage.com` |
 | `ALLOWED_ORIGINS` | Optional extra comma-separated origins |
 
-Copy your deployment **HTTP Actions URL** (ends with `.convex.site`) for `NEXT_PUBLIC_API_URL` on Vercel.
+Production Convex deployment: **`stoic-caiman-320`**
+
+| Variable | Production value |
+|----------|------------------|
+| `NEXT_PUBLIC_API_URL` | `https://stoic-caiman-320.convex.site` |
+| Convex dashboard URL | `https://stoic-caiman-320.convex.cloud` |
+
+Set `NEXT_PUBLIC_API_URL` on Vercel to the `.convex.site` URL above.
 
 ---
 
@@ -106,7 +113,7 @@ In **Clerk → Domains / Redirect URLs**, add production:
 
 | Variable | Value |
 |----------|--------|
-| `NEXT_PUBLIC_API_URL` | Your Convex `.convex.site` URL |
+| `NEXT_PUBLIC_API_URL` | `https://stoic-caiman-320.convex.site` |
 | `NEXT_PUBLIC_WEB_URL` | `https://www.fluxpage.com` |
 
 ### Razorpay (live)

@@ -15,7 +15,7 @@ const isDev = process.argv.includes("--dev");
 
 const apiBase =
   process.env.EXTENSION_API_BASE ||
-  "https://canny-woodpecker-211.convex.site";
+  "https://stoic-caiman-320.convex.site";
 const webBase = isDev
   ? process.env.EXTENSION_WEB_BASE || "http://localhost:3000"
   : process.env.EXTENSION_WEB_BASE || "https://www.fluxpage.com";

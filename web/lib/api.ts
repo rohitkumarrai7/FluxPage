@@ -1,6 +1,8 @@
 import { parseResumeText } from "./resumeParser";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://canny-woodpecker-211.convex.site";
+import { CONVEX_HTTP_URL } from "./convexDeployment";
+
+const API_URL = CONVEX_HTTP_URL;
 
 export interface User {
   id: string;

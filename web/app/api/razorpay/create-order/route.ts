@@ -5,9 +5,9 @@ import {
   isRazorpayConfigured,
   type PaidTier,
 } from "@/lib/razorpay";
+import { CONVEX_HTTP_URL } from "@/lib/convexDeployment";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://canny-woodpecker-211.convex.site";
+const API_URL = CONVEX_HTTP_URL;
 
 /** Razorpay receipt max length is 40 characters. */
 function buildReceipt(tier: string, userId: string): string {

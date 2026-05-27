@@ -16,7 +16,7 @@
 
   var STORAGE_KEY = "rf_auth";
   var _cfg = (typeof globalThis !== "undefined" && globalThis.__RESUMOD_CONFIG__) || {};
-  var API_BASE = _cfg.API_BASE || "https://canny-woodpecker-211.convex.site";
+  var API_BASE = _cfg.API_BASE || "https://stoic-caiman-320.convex.site";
 
   statusEl.textContent = "Verifying your account...";
 

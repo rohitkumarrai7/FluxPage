@@ -20,7 +20,7 @@ var DEFAULT_SETTINGS = {
 };
 
 var _cfg = (typeof globalThis !== "undefined" && globalThis.__RESUMOD_CONFIG__) || {};
-var API_BASE = _cfg.API_BASE || "https://canny-woodpecker-211.convex.site";
+var API_BASE = _cfg.API_BASE || "https://stoic-caiman-320.convex.site";
 var WEB_BASE = _cfg.WEB_BASE || "http://localhost:3000";
 var LOCAL_PDF_API = _cfg.LOCAL_PDF_API || "http://localhost:8000";
 

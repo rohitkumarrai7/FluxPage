@@ -148,10 +148,18 @@ See [`web/DEPLOY.md`](web/DEPLOY.md) for the full variable list.
 
 ### 3. Convex
 
+**Production:** `stoic-caiman-320` — see [docs/PRODUCTION_CONVEX.md](docs/PRODUCTION_CONVEX.md)
+
 From the repo root:
 
 ```bash
 npx convex dev
+```
+
+Deploy production backend:
+
+```bash
+npx convex deploy
 ```
 
 ### 4. Web app

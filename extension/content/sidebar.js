@@ -4,7 +4,7 @@
 
   function getDefaultApiEndpoint() {
     var cfg = (typeof globalThis !== "undefined" && globalThis.__RESUMOD_CONFIG__) || {};
-    var base = cfg.API_BASE || "https://canny-woodpecker-211.convex.site";
+    var base = cfg.API_BASE || "https://stoic-caiman-320.convex.site";
     return base.replace(/\/$/, "") + "/v1/ats/analyze";
   }
 
