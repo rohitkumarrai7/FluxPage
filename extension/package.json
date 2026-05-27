@@ -1,0 +1,11 @@
+{
+  "name": "fluxpage-extension",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Fluxpage Chrome extension (MV3)",
+  "scripts": {
+    "build": "node ../scripts/build-extension.mjs",
+    "dev": "node ../scripts/build-extension.mjs --dev",
+    "pack": "npm run build && node ../scripts/pack-extension.mjs"
+  }
+}

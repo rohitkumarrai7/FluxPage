@@ -1,0 +1,138 @@
+{
+  "manifest_version": 3,
+  "name": "Fluxpage — ATS Resume Assistant",
+  "version": "2.0.0",
+  "description": "Tailor your resume to any job in 30 seconds. ATS scoring, cover letters, and job tracking.",
+  "action": {
+    "default_title": "Fluxpage"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "identity",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://www.fluxpage.com/*",
+    "https://fluxpage.com/*",
+    "https://*.convex.site/*",
+    "https://*.convex.cloud/*",
+    "https://www.linkedin.com/*",
+    "https://*.linkedin.com/*",
+    "https://internshala.com/*",
+    "https://*.internshala.com/*",
+    "https://www.naukri.com/*",
+    "https://*.naukri.com/*",
+    "https://www.indeed.com/*",
+    "https://*.indeed.com/*",
+    "https://www.glassdoor.com/*",
+    "https://*.glassdoor.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://www.fluxpage.com https://fluxpage.com https://*.convex.site https://*.convex.cloud https://unpkg.com"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "config.generated.js",
+        "content/extract-common.js",
+        "content/detector.js",
+        "content/universal-extractor.js",
+        "content/floating-button.js",
+        "content/jd-highlighter.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.linkedin.com/*",
+        "https://*.linkedin.com/*"
+      ],
+      "js": [
+        "config.generated.js",
+        "content/linkedin.js",
+        "content/linkedin-profile.js",
+        "content/sidebar.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://internshala.com/*",
+        "https://*.internshala.com/*"
+      ],
+      "js": [
+        "config.generated.js",
+        "content/internshala.js",
+        "content/sidebar.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.naukri.com/*",
+        "https://*.naukri.com/*"
+      ],
+      "js": [
+        "config.generated.js",
+        "content/naukri.js",
+        "content/sidebar.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.indeed.com/*",
+        "https://*.indeed.com/*"
+      ],
+      "js": [
+        "config.generated.js",
+        "content/indeed.js",
+        "content/sidebar.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.glassdoor.com/*",
+        "https://*.glassdoor.com/*"
+      ],
+      "js": [
+        "config.generated.js",
+        "content/glassdoor.js",
+        "content/sidebar.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/pdfjs/*",
+        "content/pdf.min.js",
+        "content/pdf.worker.min.js",
+        "callback.html",
+        "callback.js",
+        "icons/logo-mark.svg",
+        "icons/logo.svg"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}
