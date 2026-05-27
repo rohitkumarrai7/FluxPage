@@ -66,12 +66,18 @@ function acceptPdfText(text: string): string | null {
 
 async function parsePdf(buffer: ArrayBuffer): Promise<string> {
   const errors: string[] = [];
+  const isVercel = Boolean(process.env.VERCEL);
 
-  const attempts: Array<{ name: string; run: () => Promise<string> }> = [
-    { name: "pdfjs", run: () => extractPdfTextLocal(buffer) },
-    { name: "convex", run: () => fetchConvexPdfText(buffer) },
-    { name: "local-api", run: () => fetchLocalBackendPdfText(buffer) },
-  ];
+  const attempts: Array<{ name: string; run: () => Promise<string> }> = isVercel
+    ? [
+        { name: "convex", run: () => fetchConvexPdfText(buffer) },
+        { name: "pdfjs", run: () => extractPdfTextLocal(buffer) },
+      ]
+    : [
+        { name: "pdfjs", run: () => extractPdfTextLocal(buffer) },
+        { name: "convex", run: () => fetchConvexPdfText(buffer) },
+        { name: "local-api", run: () => fetchLocalBackendPdfText(buffer) },
+      ];
 
   for (const { name, run } of attempts) {
     try {

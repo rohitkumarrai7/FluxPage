@@ -3,23 +3,23 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@clerk/nextjs"],
   experimental: {
-    serverComponentsExternalPackages: ["pdfjs-dist", "pdf-parse", "canvas", "@napi-rs/canvas"],
+    serverComponentsExternalPackages: ["pdfjs-dist"],
     outputFileTracingIncludes: {
       "/api/parse-resume": [
-        "./node_modules/pdf-parse/dist/**/*",
-        "./node_modules/pdfjs-dist/**/*",
+        "./node_modules/pdfjs-dist/legacy/build/pdf.js",
+        "./node_modules/pdfjs-dist/legacy/build/pdf.worker.js",
+        "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.js",
+        "./node_modules/pdfjs-dist/cmaps/**/*",
+        "./node_modules/pdfjs-dist/standard_fonts/**/*",
       ],
       "/api/parse-pdf": [
-        "./node_modules/pdf-parse/dist/**/*",
-        "./node_modules/pdfjs-dist/**/*",
+        "./node_modules/pdfjs-dist/legacy/build/pdf.js",
+        "./node_modules/pdfjs-dist/legacy/build/pdf.worker.js",
+        "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.js",
+        "./node_modules/pdfjs-dist/cmaps/**/*",
+        "./node_modules/pdfjs-dist/standard_fonts/**/*",
       ],
     },
-  },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals = [...(config.externals || []), "canvas"];
-    }
-    return config;
   },
 };
 
