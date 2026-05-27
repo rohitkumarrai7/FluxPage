@@ -1,0 +1,24 @@
+{
+  "name": "resumeforge-ats-extension",
+  "version": "2.0.0",
+  "private": true,
+  "description": "ResumeForge ATS Optimizer - Chrome Extension + Convex Backend",
+  "scripts": {
+    "convex:dev": "npx convex dev",
+    "convex:deploy": "npx convex deploy",
+    "convex:push": "npx convex deploy --cmd 'echo deployed'",
+    "extension:icons": "node scripts/generate-extension-icons.mjs",
+    "extension:build": "node scripts/generate-extension-icons.mjs && node scripts/build-extension.mjs",
+    "extension:dev": "node scripts/generate-extension-icons.mjs && node scripts/build-extension.mjs --dev",
+    "extension:pack": "npm run extension:build && node scripts/pack-extension.mjs"
+  },
+  "dependencies": {
+    "convex": "^1.39.0",
+    "pdfjs-dist": "^3.11.174"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "sharp": "^0.33.5",
+    "typescript": "^5.3.0"
+  }
+}
