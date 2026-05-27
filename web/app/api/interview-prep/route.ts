@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isMinimaxConfigured, minimaxChat } from "@/lib/minimax";
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -35,41 +36,62 @@ ${(resumeText || "Not provided").slice(0, 3000)}
 
 Generate the JSON array of interview questions now.`;
 
-    if (!GEMINI_KEY) {
-      return NextResponse.json({ error: "AI service not configured" }, { status: 503 });
-    }
+    let content = "";
+    let provider = "";
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-          generationConfig: { temperature: 0.5, maxOutputTokens: 4096 },
-        }),
+    if (isMinimaxConfigured()) {
+      const mm = await minimaxChat({
+        system: SYSTEM_PROMPT,
+        user: userPrompt,
+        temperature: 0.5,
+        maxTokens: 4096,
+      });
+      if (mm?.content) {
+        content = mm.content;
+        provider = mm.model;
       }
-    );
-
-    if (!geminiRes.ok) {
-      return NextResponse.json({ error: "AI generation failed" }, { status: 502 });
     }
 
-    const gemData = await geminiRes.json();
-    let content = gemData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!content && GEMINI_KEY) {
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
+            generationConfig: { temperature: 0.5, maxOutputTokens: 4096 },
+          }),
+        }
+      );
 
-    // Extract JSON from markdown fences if present
+      if (geminiRes.ok) {
+        const gemData = await geminiRes.json();
+        content = gemData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        provider = "gemini-2.0-flash";
+      }
+    }
+
+    if (!content) {
+      return NextResponse.json(
+        { error: "AI service not configured (set MINIMAX_API_KEY or GEMINI_API_KEY)" },
+        { status: 503 }
+      );
+    }
+
+    let parsed = content;
     const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-    if (jsonMatch) content = jsonMatch[1];
+    if (jsonMatch) parsed = jsonMatch[1];
 
     try {
-      const questions = JSON.parse(content.trim());
-      return NextResponse.json({ questions, provider: "gemini-2.0-flash" });
+      const questions = JSON.parse(parsed.trim());
+      return NextResponse.json({ questions, provider });
     } catch {
-      return NextResponse.json({ questions: [], raw: content, provider: "gemini-2.0-flash" });
+      return NextResponse.json({ questions: [], raw: content, provider });
     }
-  } catch (error: any) {
-    console.error("[interview-prep] Error:", error);
-    return NextResponse.json({ error: error.message || "Generation failed" }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Generation failed";
+    console.error("[interview-prep] Error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

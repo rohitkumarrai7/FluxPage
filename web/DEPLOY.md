@@ -141,7 +141,15 @@ Enable event: `payment.captured`.
 
 ### AI (optional)
 
-Set at least one: `GEMINI_API_KEY` or `OPENROUTER_API_KEY`.
+**Primary LLM (recommended):** MiniMax M2.7
+
+| Variable | Value |
+|----------|--------|
+| `MINIMAX_API_KEY` | From [MiniMax platform](https://platform.minimax.io) |
+| `MINIMAX_MODEL` | `MiniMax-M2.7` |
+| `MINIMAX_API_URL` | `https://api.minimax.io/v1/chat/completions` |
+
+Optional fallbacks: `GEMINI_API_KEY`, `OPENROUTER_API_KEY`.
 
 Redeploy Vercel after saving all variables.
 

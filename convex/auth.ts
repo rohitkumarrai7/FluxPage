@@ -294,8 +294,15 @@ export const clerkSync = mutation({
   },
   handler: async (ctx, args) => {
     const expected = process.env.CLERK_SYNC_SECRET;
-    if (!expected || args.syncSecret !== expected) {
-      throw new Error("Unauthorized");
+    if (!expected) {
+      throw new Error(
+        "CLERK_SYNC_SECRET is not set on this Convex deployment. Add it in Convex dashboard → stoic-caiman-320 → Settings → Environment Variables."
+      );
+    }
+    if (args.syncSecret !== expected) {
+      throw new Error(
+        "CLERK_SYNC_SECRET mismatch: Vercel and Convex must use the exact same value."
+      );
     }
 
     let user = await ctx.db

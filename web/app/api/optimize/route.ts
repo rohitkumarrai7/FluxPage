@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isMinimaxConfigured, minimaxChat } from "@/lib/minimax";
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || "";
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const API_URL = process.env.LLM_API_URL || "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = process.env.LLM_MODEL || "minimax/minimax-m2.5:free";
+const MODEL = process.env.LLM_MODEL || "MiniMax-M2.7";
 
 const GARBAGE_KW = new Set([
   "development", "ai-generated", "modern", "optimization", "improve",
@@ -143,8 +144,30 @@ Generate the COMPLETE optimized LaTeX resume. Ensure \\end{document} is present.
     let latexSource = "";
     let usedModel = "";
 
-    // Priority 1: Gemini (free, unlimited, fast) with retry
-    if (GEMINI_KEY) {
+    // Priority 0: MiniMax M2.7 (native API)
+    if (isMinimaxConfigured()) {
+      console.log("[/api/optimize] Trying MiniMax M2.7");
+      const mm = await minimaxChat({
+        system: SYSTEM_PROMPT,
+        user: userPrompt,
+        temperature: 0.3,
+        maxTokens: 8192,
+      });
+      if (mm?.content) {
+        let out = mm.content;
+        if (out.includes("```latex")) out = out.replace(/```latex\n?/g, "").replace(/```/g, "");
+        if (out.includes("```")) out = out.replace(/```\n?/g, "");
+        out = out.trim();
+        if (out.startsWith("\\documentclass")) {
+          latexSource = out;
+          usedModel = mm.model;
+          console.log("[/api/optimize] MiniMax success, length:", latexSource.length);
+        }
+      }
+    }
+
+    // Priority 1: Gemini (fallback)
+    if (!latexSource && GEMINI_KEY) {
       const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash-preview-05-20"];
       for (const gemModel of geminiModels) {
         for (let attempt = 0; attempt < 2; attempt++) {

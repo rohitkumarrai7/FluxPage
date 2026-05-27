@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CONVEX_HTTP_URL } from "@/lib/convexDeployment";
+import { isMinimaxConfigured, minimaxChat } from "@/lib/minimax";
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const API_URL = CONVEX_HTTP_URL;
@@ -66,43 +67,47 @@ ${resumeText.slice(0, 4000)}
 
 Write the cover letter now.`;
 
-    if (!GEMINI_KEY) {
-      return NextResponse.json(
-        { error: "AI service not configured" },
-        { status: 503 }
-      );
-    }
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-        }),
+    if (isMinimaxConfigured()) {
+      const mm = await minimaxChat({
+        system: SYSTEM_PROMPT,
+        user: userPrompt,
+        temperature: 0.4,
+        maxTokens: 2048,
+      });
+      if (mm?.content) {
+        return NextResponse.json({ content: mm.content, provider: mm.model });
       }
-    );
-
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text().catch(() => "");
-      console.error("[cover-letter] Gemini error:", geminiRes.status, errText.slice(0, 200));
-      return NextResponse.json(
-        { error: "AI generation failed" },
-        { status: 502 }
-      );
     }
 
-    const gemData = await geminiRes.json();
-    const content = gemData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (GEMINI_KEY) {
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+          }),
+        }
+      );
 
-    return NextResponse.json({ content, provider: "gemini-2.0-flash" });
-  } catch (error: any) {
-    console.error("[cover-letter] Error:", error);
+      if (geminiRes.ok) {
+        const gemData = await geminiRes.json();
+        const content = gemData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (content) {
+          return NextResponse.json({ content, provider: "gemini-2.0-flash" });
+        }
+      }
+    }
+
     return NextResponse.json(
-      { error: error.message || "Generation failed" },
-      { status: 500 }
+      { error: "AI service not configured (set MINIMAX_API_KEY or GEMINI_API_KEY)" },
+      { status: 503 }
     );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Generation failed";
+    console.error("[cover-letter] Error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

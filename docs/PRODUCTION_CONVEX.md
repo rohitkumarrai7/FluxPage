@@ -28,6 +28,17 @@ In [Convex dashboard](https://dashboard.convex.dev) → **stoic-caiman-320** →
 | `WEB_BASE` | `https://www.fluxpage.com` |
 | `ALLOWED_ORIGINS` | `https://www.fluxpage.com,https://fluxpage.com` |
 
+### Fix `/auth/sync` Unauthorized
+
+Vercel hides sensitive values — you cannot read `CLERK_SYNC_SECRET` from History. **Set a new value you choose:**
+
+1. Vercel → Environment Variables → click **CLERK_SYNC_SECRET** row (not History).
+2. **Edit** → set **Value** to e.g. `resumod-clerk-sync-dev` (or any long random string).
+3. Convex **stoic-caiman-320** → add **identical** `CLERK_SYNC_SECRET`.
+4. Redeploy Vercel.
+
+Both sides must match **exactly** (character for character).
+
 ## Vercel env vars (production)
 
 | Variable | Value |
@@ -36,7 +47,10 @@ In [Convex dashboard](https://dashboard.convex.dev) → **stoic-caiman-320** →
 | `NEXT_PUBLIC_WEB_URL` | `https://www.fluxpage.com` |
 | `RAZORPAY_WEBHOOK_SECRET` | Same as Razorpay webhook Secret field |
 | `RAZORPAY_KEY_SECRET` | Live Razorpay API secret |
-| `CLERK_SYNC_SECRET` | Matches Convex |
+| `CLERK_SYNC_SECRET` | Must match Convex prod exactly (create/edit in Vercel if hidden) |
+| `MINIMAX_API_KEY` | From MiniMax platform |
+| `MINIMAX_MODEL` | `MiniMax-M2.7` |
+| `MINIMAX_API_URL` | `https://api.minimax.io/v1/chat/completions` |
 
 Redeploy Vercel after changing variables.
 
