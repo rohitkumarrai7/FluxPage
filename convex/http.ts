@@ -213,8 +213,10 @@ http.route({
       });
       return jsonResponse(request, result);
     } catch (e: any) {
-      const status = e.message === "Unauthorized" ? 401 : 400;
-      return jsonResponse(request, { detail: e.message || "Clerk sync failed" }, status);
+      const msg = e.message || "Clerk sync failed";
+      const status =
+        msg.includes("mismatch") || msg.includes("not set") ? 401 : 400;
+      return jsonResponse(request, { detail: msg }, status);
     }
   }),
 });

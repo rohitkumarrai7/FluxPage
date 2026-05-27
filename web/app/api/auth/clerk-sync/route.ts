@@ -28,9 +28,17 @@ export async function POST() {
     user.username ||
     undefined;
 
-  const syncSecret = process.env.CLERK_SYNC_SECRET;
+  const syncSecret =
+    process.env.CLERK_SYNC_SECRET?.trim() ||
+    process.env.RAZORPAY_WEBHOOK_INTERNAL_SECRET?.trim();
   if (!syncSecret) {
-    return NextResponse.json({ detail: "CLERK_SYNC_SECRET not configured" }, { status: 500 });
+    return NextResponse.json(
+      {
+        detail:
+          "CLERK_SYNC_SECRET not configured on Vercel. Add it under Project → Settings → Environment Variables (Production), then redeploy.",
+      },
+      { status: 500 }
+    );
   }
 
   const res = await fetch(`${API_URL}/v1/auth/clerk-sync`, {

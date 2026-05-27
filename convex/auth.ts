@@ -293,13 +293,19 @@ export const clerkSync = mutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const expected = process.env.CLERK_SYNC_SECRET;
-    if (!expected) {
+    const candidates = [
+      process.env.CLERK_SYNC_SECRET,
+      process.env.RAZORPAY_WEBHOOK_INTERNAL_SECRET,
+    ]
+      .filter(Boolean)
+      .map((s) => s!.trim());
+    if (candidates.length === 0) {
       throw new Error(
         "CLERK_SYNC_SECRET is not set on this Convex deployment. Add it in Convex dashboard → stoic-caiman-320 → Settings → Environment Variables."
       );
     }
-    if (args.syncSecret !== expected) {
+    const provided = args.syncSecret.trim();
+    if (!candidates.some((expected) => provided === expected)) {
       throw new Error(
         "CLERK_SYNC_SECRET mismatch: Vercel and Convex must use the exact same value."
       );
