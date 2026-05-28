@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui";
+import {
+  CONTACT_EMAIL_PRIMARY,
+  CONTACT_EMAIL_SECONDARY,
+  CONTACT_MAILTO_PRIMARY,
+  CONTACT_MAILTO_SECONDARY,
+} from "@/lib/contact";
 
 export const metadata = {
   title: "Privacy Policy — Fluxpage",
@@ -82,8 +88,12 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold mt-8">Contact</h2>
           <p className="text-muted">
             Questions:{" "}
-            <a href="mailto:support@fluxpage.com" className="text-primary hover:underline">
-              support@fluxpage.com
+            <a href={CONTACT_MAILTO_PRIMARY} className="text-primary hover:underline">
+              {CONTACT_EMAIL_PRIMARY}
+            </a>
+            {" · "}
+            <a href={CONTACT_MAILTO_SECONDARY} className="text-primary hover:underline">
+              {CONTACT_EMAIL_SECONDARY}
             </a>
           </p>
         </section>

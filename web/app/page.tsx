@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Logo, Button, Card, PricingGrid } from "@/components/ui";
 import Link from "next/link";
+import {
+  CONTACT_EMAIL_PRIMARY,
+  CONTACT_EMAIL_SECONDARY,
+  CONTACT_MAILTO_PRIMARY,
+  CONTACT_MAILTO_SECONDARY,
+} from "@/lib/contact";
 
 const FEATURES = [
   {
@@ -421,7 +427,16 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold text-sm mb-3">Contact</h4>
               <ul className="space-y-2 text-sm text-muted">
-                <li><a href="mailto:support@fluxpage.com" className="hover:text-foreground">support@fluxpage.com</a></li>
+                <li>
+                  <a href={CONTACT_MAILTO_PRIMARY} className="hover:text-foreground">
+                    {CONTACT_EMAIL_PRIMARY}
+                  </a>
+                </li>
+                <li>
+                  <a href={CONTACT_MAILTO_SECONDARY} className="hover:text-foreground">
+                    {CONTACT_EMAIL_SECONDARY}
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
