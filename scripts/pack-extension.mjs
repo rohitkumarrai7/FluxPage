@@ -8,7 +8,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extDir = path.join(__dirname, "..", "extension");
 const outZip = path.join(extDir, "fluxpage-extension.zip");
 
-const exclude = new Set(["fluxpage-extension.zip", "package.json", "extension.config.example.js"]);
+const exclude = new Set([
+  "fluxpage-extension.zip",
+  "package.json",
+  "extension.config.example.js",
+  "README.md",
+]);
 
 function zipWithPowerShell() {
   if (fs.existsSync(outZip)) fs.unlinkSync(outZip);
@@ -31,6 +36,20 @@ function zipWithPowerShell() {
   );
   fs.rmSync(tempDir, { recursive: true });
   console.log(`Packed: ${outZip}`);
+  console.log("Upload THIS zip to Chrome Web Store (manifest.json must be at zip root).");
+
+  const storeDir = path.join(__dirname, "..", ".zip for store");
+  if (fs.existsSync(storeDir)) {
+    const storeZip = path.join(storeDir, "fluxpage-extension-store.zip");
+    fs.copyFileSync(outZip, storeZip);
+    const badZip = path.join(storeDir, "extension.zip");
+    if (fs.existsSync(badZip)) {
+      console.warn(
+        `WARNING: ${badZip} has files inside an "extension/" folder — Chrome will reject it. Use fluxpage-extension-store.zip instead.`
+      );
+    }
+    console.log(`Also copied: ${storeZip}`);
+  }
 }
 
 zipWithPowerShell();

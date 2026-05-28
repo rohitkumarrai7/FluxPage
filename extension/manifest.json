@@ -123,8 +123,6 @@
     {
       "resources": [
         "lib/pdfjs/*",
-        "content/pdf.min.js",
-        "content/pdf.worker.min.js",
         "callback.html",
         "callback.js",
         "icons/logo-mark.svg",
