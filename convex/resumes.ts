@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { assertCanUploadResume } from "./planLimits";
+import { parseResumeNER } from "./nerParser";
 
 export const upload = mutation({
   args: {
@@ -23,6 +24,11 @@ export const upload = mutation({
 
     const isFirst = resumes.length === 0;
 
+    const textForParse = args.rawText || args.textPreview || "";
+    const structuredData = textForParse
+      ? parseResumeNER(textForParse)
+      : args.structuredData;
+
     const resumeId = await ctx.db.insert("resumes", {
       userId: args.userId,
       filename: args.filename,
@@ -30,7 +36,7 @@ export const upload = mutation({
       fileSize: args.fileSize,
       textPreview: args.textPreview,
       rawText: args.rawText,
-      structuredData: args.structuredData,
+      structuredData,
       label: args.label || args.filename.replace(/\.[^/.]+$/, ""),
       isDefault: isFirst,
     });

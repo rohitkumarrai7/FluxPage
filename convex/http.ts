@@ -1,7 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api } from "./_generated/api";
-import { scoreResumeAgainstJD } from "./atsScoring";
+import { scoreResumeAgainstJD, scoreEnterpriseATS } from "./atsScoring";
 
 const http = httpRouter();
 
@@ -533,49 +533,57 @@ http.route({
 
 // ─── ATS Analysis ──────────────────────────────────────────────────────────────
 
+function buildAtsAnalyzeResponse(result: ReturnType<typeof scoreEnterpriseATS>) {
+  return {
+    score: result.overallScore,
+    maxPossibleScore: 100,
+    passedKnockouts: result.passedKnockouts,
+    knockoutDetails: result.knockoutDetails,
+    breakdown: result.breakdown,
+    weights: result.weights,
+    matchedKeywords: result.matchedKeywords,
+    missingKeywords: result.missingKeywords,
+    relatedMatches: result.relatedMatches,
+    suggestions: result.suggestions,
+    parsedResume: result.parsedResume,
+    parsedJD: result.parsedJD,
+    estimatedAtsPassRate: !result.passedKnockouts
+      ? "rejected"
+      : result.overallScore >= 75
+        ? "high"
+        : result.overallScore >= 50
+          ? "medium"
+          : "low",
+  };
+}
+
 http.route({
   path: "/v1/ats/analyze",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
       const body = await request.json();
-      const result = scoreResumeAgainstJD(body.resumeText || "", body.jobDescription || "");
-
-      const resumeText = body.resumeText || "";
-      const secScore = sectionCompletenessScore(resumeText);
-
-      return jsonResponse(request, {
-        score: result.overallScore,
-        maxPossibleScore: 100,
-        breakdown: {
-          keywordMatch: result.matchedKeywords.length,
-          semanticSimilarity: 0,
-          sectionCompleteness: Math.round(secScore * 100),
-          formatCompatibility: 85,
-        },
-        matchedKeywords: result.matchedKeywords,
-        missingKeywords: result.missingKeywords,
-        suggestions: result.suggestions,
-        estimatedAtsPassRate: result.overallScore >= 75 ? "high" : result.overallScore >= 50 ? "medium" : "low",
-      });
+      const result = scoreEnterpriseATS(body.resumeText || "", body.jobDescription || "");
+      return jsonResponse(request, buildAtsAnalyzeResponse(result));
     } catch (e: any) {
       return jsonResponse(request, { detail: e.message }, 400);
     }
   }),
 });
 
-function sectionCompletenessScore(text: string): number {
-  const patterns = [
-    /(phone|email|linkedin|@)/i,
-    /(summary|objective|about|profile)/i,
-    /(experience|employment|work history)/i,
-    /(education|degree|university|college)/i,
-    /(skills|technologies|competencies)/i,
-  ];
-  let found = 0;
-  for (const p of patterns) if (p.test(text)) found++;
-  return found / patterns.length;
-}
+http.route({
+  path: "/v1/ats/analyze-enterprise",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      const result = scoreEnterpriseATS(body.resumeText || "", body.jobDescription || "");
+      return jsonResponse(request, buildAtsAnalyzeResponse(result));
+    } catch (e: any) {
+      return jsonResponse(request, { detail: e.message }, 400);
+    }
+  }),
+});
 
 // ─── AI Generate ──────────────────────────────────────────────────────────────
 
