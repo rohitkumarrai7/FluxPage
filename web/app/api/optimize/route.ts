@@ -1,27 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isMinimaxConfigured, minimaxChat } from "@/lib/minimax";
+import { isOpenRouterConfigured, openRouterChat } from "@/lib/openrouter";
+import { analyzeJobDescription, mergeJDKeywordsWithATS } from "@/lib/jdAnalyzer";
 
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || "";
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
-const API_URL = process.env.LLM_API_URL || "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = process.env.LLM_MODEL || "MiniMax-M2.7";
 
 const GARBAGE_KW = new Set([
-  "development", "ai-generated", "modern", "optimization", "improve",
-  "technologies", "advanced", "related", "architecture", "design",
   "looking", "join", "company", "opportunity", "position", "apply",
   "prefer", "required", "preferred", "qualifications", "bonus",
-  "excellent", "communication", "understanding", "knowledge",
-  "familiarity", "proficiency", "proficient", "expertise", "hands-on",
-  "environment", "agile", "practices", "methodologies", "approach",
-  "solutions", "deliver", "delivering", "building", "creating",
+  "excellent", "familiarity", "proficiency", "hands-on",
+  "environment", "deliver", "delivering", "creating",
   "maintaining", "ensure", "across", "multiple", "both", "either",
-  "based", "focus", "focused", "maintainability", "end",
-  "scalable", "production", "integration", "implementation",
-  "management", "quality", "best", "standards", "process",
-  "processes", "platform", "platforms", "frameworks", "libraries",
-  "develop", "developing", "provide", "providing", "support",
-  "supporting", "collaborate", "collaborating", "contribute",
+  "based", "focus", "focused", "end",
+  "provide", "providing", "support", "collaborate", "contribute",
   "drive", "driving", "lead", "leading", "ensuring",
   "help", "want", "like", "would", "could", "may", "might",
   "since", "still", "while", "then", "there", "here", "much",
@@ -30,20 +21,15 @@ const GARBAGE_KW = new Set([
   "whether", "high", "low", "great", "key", "core",
   "deep", "wide", "full", "true", "real", "able", "available",
   "minimum", "maximum", "ideal", "clear", "simple", "complex",
-  "enhance", "deliverables", "domain", "evaluate", "assess",
-  "scalability", "software", "models", "responsive", "code",
-  "research", "analysis", "analytical", "strong", "written",
-  "verbal", "interpersonal", "detail-oriented", "self-motivated",
-  "proactive", "passionate", "driven", "enthusiastic", "curious",
-  "innovative", "diverse", "top", "exceptional", "interactive",
-  "applications", "bairesdev", "grade", "tier",
+  "enhance", "evaluate", "assess", "diverse", "top", "exceptional",
+  "bairesdev", "grade", "tier",
 ]);
 
 function filterKeywords(keywords: string[]): string[] {
   return keywords.filter((kw) => {
     const lower = kw.toLowerCase().trim();
     if (GARBAGE_KW.has(lower)) return false;
-    if (lower.length < 3) return false;
+    if (lower.length < 2) return false;
     return true;
   });
 }
@@ -69,23 +55,6 @@ function extractContactFromLatex(latex: string): { email: string; phone: string;
   };
 }
 
-const SECTION_REGEX: [RegExp, string][] = [
-  [/^(professional\s+summary|summary|objective|about\s+me|profile|career\s+summary)/i, "Professional Summary"],
-  [/^(work\s+experience|professional\s+experience|experience|employment|work\s+history)/i, "Experience"],
-  [/^(technical\s+skills|skills|technologies|competencies|core\s+competencies)/i, "Skills"],
-  [/^(projects?|personal\s+projects?|key\s+projects?)/i, "Projects"],
-  [/^(education|academic\s+background|academics)/i, "Education"],
-  [/^(achievements?|awards?|honors?|accomplishments?|certifications?)/i, "Achievements"],
-];
-
-function isSectionHeading(trimmed: string): string | null {
-  if (trimmed.length > 60) return null;
-  for (const [regex, heading] of SECTION_REGEX) {
-    if (regex.test(trimmed)) return heading;
-  }
-  return null;
-}
-
 const SYSTEM_PROMPT = `You are an expert resume writer who generates LaTeX resumes. Follow these rules STRICTLY:
 
 CRITICAL RULES:
@@ -94,21 +63,36 @@ CRITICAL RULES:
 3. Keep ALL sections from the original resume: Summary, Experience, Skills, Projects, Education, Achievements.
 4. Do NOT remove or merge sections. Experience MUST be a separate section from Projects.
 5. Only rephrase bullet points - do NOT change company names, dates, metrics, or technologies.
-6. Add missing keywords NATURALLY within bullet points where truthful - do NOT list them in Skills.
+6. Add missing keywords NATURALLY within bullet points AND in the Skills section where appropriate.
 7. Generate ONLY valid LaTeX code using article class with standard packages.
 8. No markdown fences, no explanations.
 9. Use \\textbf{} for job titles and company names within Experience section items.
 10. Keep the resume to 1 page maximum.
 11. IMPORTANT: Generate the COMPLETE document. Do NOT truncate. The \\end{document} must be present.
-12. Make sure ALL braces {} are properly matched and closed.`;
+12. Make sure ALL braces {} are properly matched and closed.
+13. Rewrite the Summary to directly address the target role, weaving in 3-5 missing keywords naturally.
+14. For each experience bullet, incorporate at least 1 missing keyword if it can be truthfully added.
+15. Add a targeted skills subsection if the role requires domain-specific terms not in the original.`;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { resumeText, currentLatex, jobDescription, jobTitle, company, matchedKeywords, missingKeywords, suggestions, source } = body;
 
-    const cleanMissing = filterKeywords(missingKeywords || []);
-    const cleanMatched = filterKeywords(matchedKeywords || []);
+    let enhancedMissing = filterKeywords(missingKeywords || []);
+    let enhancedMatched = filterKeywords(matchedKeywords || []);
+
+    if (jobDescription) {
+      try {
+        const jdAnalysis = await analyzeJobDescription(jobDescription, jobTitle);
+        const merged = mergeJDKeywordsWithATS(jdAnalysis, enhancedMatched, enhancedMissing);
+        enhancedMissing = filterKeywords(merged.missingKeywords);
+        enhancedMatched = merged.matchedKeywords;
+        console.log(`[/api/optimize] JD analysis (${jdAnalysis.source}): ${jdAnalysis.hardSkills.length} hard, ${jdAnalysis.tools.length} tools, ${jdAnalysis.keywords.length} phrases`);
+      } catch (err) {
+        console.error("[/api/optimize] JD analysis failed, using raw keywords:", err);
+      }
+    }
 
     const latexName = currentLatex ? extractNameFromLatex(currentLatex) : "";
     const latexContact = currentLatex ? extractContactFromLatex(currentLatex) : { email: "", phone: "", linkedin: "" };
@@ -117,6 +101,10 @@ export async function POST(req: NextRequest) {
     if (latexContact.phone) contactInfo.push(`Phone: ${latexContact.phone}`);
     if (latexContact.email) contactInfo.push(`Email: ${latexContact.email}`);
     if (latexContact.linkedin) contactInfo.push(`LinkedIn: ${latexContact.linkedin}`);
+
+    const suggestionContext = Array.isArray(suggestions) && suggestions.length > 0
+      ? `\n**Prior ATS suggestions to incorporate:**\n${suggestions.slice(0, 6).map((s: string) => `- ${s}`).join("\n")}`
+      : "";
 
     const userPrompt = `${latexName ? `IMPORTANT - Use this EXACT name: "${latexName}"` : ""}
 ${contactInfo.length > 0 ? `IMPORTANT - Use these EXACT contacts: ${contactInfo.join(" | ")}` : ""}
@@ -136,47 +124,51 @@ ${currentLatex ? `**Current LaTeX Source (improve, keep all data):**
 ${currentLatex}` : ""}
 
 **ATS Analysis:**
-- Matched: ${cleanMatched.join(", ")}
-- Missing (weave into bullets naturally): ${cleanMissing.join(", ")}
+- Matched: ${enhancedMatched.join(", ")}
+- Missing (MUST weave into bullets and skills naturally): ${enhancedMissing.join(", ")}
+${suggestionContext}
 
 Generate the COMPLETE optimized LaTeX resume. Ensure \\end{document} is present.`;
 
     let latexSource = "";
     let usedModel = "";
 
-    // Priority 0: MiniMax M2.7 (native API)
-    if (isMinimaxConfigured()) {
-      console.log("[/api/optimize] Trying MiniMax M2.7");
-      const mm = await minimaxChat({
+    const tryLatex = (raw: string, model: string): boolean => {
+      let out = raw;
+      if (out.includes("```latex")) out = out.replace(/```latex\n?/g, "").replace(/```/g, "");
+      if (out.includes("```")) out = out.replace(/```\n?/g, "");
+      out = out.trim();
+      if (out.startsWith("\\documentclass")) {
+        latexSource = out;
+        usedModel = model;
+        return true;
+      }
+      return false;
+    };
+
+    if (isOpenRouterConfigured()) {
+      console.log("[/api/optimize] Trying OpenRouter GPT models");
+      const or = await openRouterChat({
         system: SYSTEM_PROMPT,
         user: userPrompt,
         temperature: 0.3,
-        maxTokens: 8192,
+        maxTokens: 6000,
       });
-      if (mm?.content) {
-        let out = mm.content;
-        if (out.includes("```latex")) out = out.replace(/```latex\n?/g, "").replace(/```/g, "");
-        if (out.includes("```")) out = out.replace(/```\n?/g, "");
-        out = out.trim();
-        if (out.startsWith("\\documentclass")) {
-          latexSource = out;
-          usedModel = mm.model;
-          console.log("[/api/optimize] MiniMax success, length:", latexSource.length);
-        }
+      if (or?.content && tryLatex(or.content, or.model)) {
+        console.log("[/api/optimize] OpenRouter success, length:", latexSource.length);
       }
     }
 
-    // Priority 1: Gemini (fallback)
     if (!latexSource && GEMINI_KEY) {
       const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash-preview-05-20"];
       for (const gemModel of geminiModels) {
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
-            if (attempt === 0) {
-              console.log(`[/api/optimize] Trying Gemini ${gemModel}`);
-            } else {
+            if (attempt > 0) {
               console.log(`[/api/optimize] Retrying Gemini ${gemModel} after delay`);
               await new Promise((r) => setTimeout(r, 5000));
+            } else {
+              console.log(`[/api/optimize] Trying Gemini ${gemModel}`);
             }
             const geminiRes = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${gemModel}:generateContent?key=${GEMINI_KEY}`,
@@ -223,82 +215,56 @@ Generate the COMPLETE optimized LaTeX resume. Ensure \\end{document} is present.
       }
     }
 
-    // Priority 2: OpenRouter models
-    if (!latexSource && OPENROUTER_KEY) {
-      const modelsToTry = [
-        MODEL,
-        "minimax/minimax-m2.5:free",
-        "qwen/qwen3-next-80b-a3b-instruct:free",
-        "deepseek/deepseek-v4-flash:free",
-        "google/gemma-4-26b-a4b-it:free",
-        "qwen/qwen3-coder:free",
-      ].filter((m, i, arr) => arr.indexOf(m) === i);
-
-      let lastError = "";
-
-      for (const model of modelsToTry) {
-        try {
-          const response = await fetch(API_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${OPENROUTER_KEY}`,
-              "HTTP-Referer": "http://localhost:3000",
-              "X-Title": "ResumeForge",
-            },
-            body: JSON.stringify({
-              model,
-              messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: userPrompt },
-              ],
-              temperature: 0.3,
-              max_tokens: 6000,
-            }),
-          });
-
-          if (!response.ok) {
-            const errText = await response.text().catch(() => "");
-            console.error(`LLM API error for ${model}:`, response.status, errText.slice(0, 150));
-            lastError = `LLM ${model}: ${response.status}`;
-            continue;
-          }
-
-          const data = await response.json();
-          let llmOutput = data.choices?.[0]?.message?.content || "";
-          if (llmOutput.includes("```latex")) llmOutput = llmOutput.replace(/```latex\n?/g, "").replace(/```/g, "");
-          if (llmOutput.includes("```")) llmOutput = llmOutput.replace(/```\n?/g, "");
-          llmOutput = llmOutput.trim();
-
-          if (llmOutput.startsWith("\\documentclass")) {
-            latexSource = llmOutput;
-            usedModel = model;
-            break;
-          }
-          lastError = `${model}: invalid LaTeX`;
-        } catch (err) {
-          lastError = (err as Error).message;
+    if (!latexSource && isMinimaxConfigured()) {
+      console.log("[/api/optimize] Trying MiniMax fallback");
+      const mm = await minimaxChat({
+        system: SYSTEM_PROMPT,
+        user: userPrompt,
+        temperature: 0.3,
+        maxTokens: 8192,
+      });
+      if (mm?.content) {
+        tryLatex(mm.content, mm.model);
+        if (latexSource) {
+          console.log("[/api/optimize] MiniMax success, length:", latexSource.length);
         }
-      }
-
-      if (!latexSource) {
-        console.error("[/api/optimize] All models failed, using fallback");
-        latexSource = generateFallbackLatex(resumeText, currentLatex, jobTitle || "Resume", company || "", cleanMissing);
-        return NextResponse.json({ latexSource, optimized: false, error: "All LLM models failed" });
       }
     }
 
     if (!latexSource) {
-      latexSource = generateFallbackLatex(resumeText, currentLatex, jobTitle || "Resume", company || "", cleanMissing);
-      return NextResponse.json({ latexSource, optimized: false, error: "No LLM available" });
+      console.error("[/api/optimize] All LLM providers failed, using rule-based fallback");
+      latexSource = generateFallbackLatex(resumeText, currentLatex, jobTitle || "Resume", company || "", enhancedMissing);
+      return NextResponse.json({ latexSource, optimized: false, error: "All LLM models failed" });
     }
 
-    // Validate: ensure \end{document} exists
     if (!latexSource.includes("\\end{document}")) {
       latexSource += "\n\\end{document}";
     }
 
-    return NextResponse.json({ latexSource, optimized: true, model: usedModel });
+    const plainText = latexSource
+      .replace(/\\documentclass[\s\S]*?\\begin\{document\}/g, "")
+      .replace(/\\end\{document\}/g, "")
+      .replace(/\\[a-zA-Z]+\{([^}]*)\}/g, "$1")
+      .replace(/\\[a-zA-Z]+/g, " ")
+      .replace(/[{}\\$]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const keywordsFound = enhancedMissing.filter((kw) =>
+      plainText.toLowerCase().includes(kw.toLowerCase())
+    );
+    const keywordsStillMissing = enhancedMissing.filter((kw) =>
+      !plainText.toLowerCase().includes(kw.toLowerCase())
+    );
+
+    return NextResponse.json({
+      latexSource,
+      optimized: true,
+      model: usedModel,
+      keywordsInjected: keywordsFound.length,
+      keywordsStillMissing,
+      totalMissing: enhancedMissing.length,
+    });
   } catch (err: any) {
     console.error("Optimize error:", err);
     return NextResponse.json({
@@ -307,6 +273,23 @@ Generate the COMPLETE optimized LaTeX resume. Ensure \\end{document} is present.
       optimized: false,
     }, { status: 500 });
   }
+}
+
+const SECTION_REGEX: [RegExp, string][] = [
+  [/^(professional\s+summary|summary|objective|about\s+me|profile|career\s+summary)/i, "Professional Summary"],
+  [/^(work\s+experience|professional\s+experience|experience|employment|work\s+history)/i, "Experience"],
+  [/^(technical\s+skills|skills|technologies|competencies|core\s+competencies)/i, "Skills"],
+  [/^(projects?|personal\s+projects?|key\s+projects?)/i, "Projects"],
+  [/^(education|academic\s+background|academics)/i, "Education"],
+  [/^(achievements?|awards?|honors?|accomplishments?|certifications?)/i, "Achievements"],
+];
+
+function isSectionHeading(trimmed: string): string | null {
+  if (trimmed.length > 60) return null;
+  for (const [regex, heading] of SECTION_REGEX) {
+    if (regex.test(trimmed)) return heading;
+  }
+  return null;
 }
 
 function generateFallbackLatex(
@@ -333,10 +316,7 @@ function generateFallbackLatex(
     linkedin = contact.linkedin;
   }
 
-  interface Section {
-    heading: string;
-    lines: string[];
-  }
+  interface Section { heading: string; lines: string[] }
   const sections: Section[] = [];
   let currentSection: Section | null = null;
 
@@ -344,10 +324,6 @@ function generateFallbackLatex(
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    if (!email && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed)) {
-      email = trimmed;
-      continue;
-    }
     if (!email && /[\w.+-]+@[\w.-]+\.\w+/.test(trimmed) && !headerDone) {
       const m = trimmed.match(/([\w.+-]+@[\w.-]+\.\w+)/);
       if (m) email = m[1];
@@ -374,11 +350,8 @@ function generateFallbackLatex(
     }
 
     if (!name && !headerDone && trimmed.length > 2 && trimmed.length < 60 &&
-        /^[A-Z]/.test(trimmed) &&
-        !/[@|:;,]/.test(trimmed) &&
-        !/^\d/.test(trimmed) &&
-        !/(http|www|\.com|\.in|\.org)/.test(trimmed) &&
-        !/^\+?\d/.test(trimmed)) {
+        /^[A-Z]/.test(trimmed) && !/[@|:;,]/.test(trimmed) &&
+        !/^\d/.test(trimmed) && !/(http|www|\.com)/.test(trimmed)) {
       name = trimmed;
       continue;
     }
@@ -388,13 +361,9 @@ function generateFallbackLatex(
       continue;
     }
 
-    if (!headerDone) {
-      if (/^—/.test(trimmed) || /^[•\-\*]\s/.test(trimmed) || /remote/i.test(trimmed)) continue;
-      if (trimmed.includes("LinkedIn") || trimmed.includes("GitHub") || trimmed.includes("GitLab")) continue;
-    }
-
+    if (!headerDone) continue;
     if (currentSection) {
-      if (trimmed === "1" || trimmed === "•" || /^\d+$/.test(trimmed)) continue;
+      if (/^\d+$/.test(trimmed) || trimmed === "•") continue;
       currentSection.lines.push(trimmed);
     }
   }
@@ -427,7 +396,6 @@ function generateFallbackLatex(
     return true;
   });
   const allSkills = [...new Set([...rawSkills, ...cleanMissingForSkills])].slice(0, 25);
-
   const contactParts = [location, phone, email, linkedin, github].filter(Boolean);
 
   let latex = `\\documentclass[11pt,a4paper]{article}

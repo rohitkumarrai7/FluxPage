@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CONVEX_HTTP_URL } from "@/lib/convexDeployment";
-import { isMinimaxConfigured, minimaxChat } from "@/lib/minimax";
+import { chatWithFallback } from "@/lib/llm";
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const API_URL = CONVEX_HTTP_URL;
 
 const SYSTEM_PROMPT = `You are an expert cover letter writer. Generate a compelling, professional cover letter.
@@ -67,42 +66,19 @@ ${resumeText.slice(0, 4000)}
 
 Write the cover letter now.`;
 
-    if (isMinimaxConfigured()) {
-      const mm = await minimaxChat({
-        system: SYSTEM_PROMPT,
-        user: userPrompt,
-        temperature: 0.4,
-        maxTokens: 2048,
-      });
-      if (mm?.content) {
-        return NextResponse.json({ content: mm.content, provider: mm.model });
-      }
-    }
+    const result = await chatWithFallback({
+      system: SYSTEM_PROMPT,
+      user: userPrompt,
+      temperature: 0.4,
+      maxTokens: 2048,
+    });
 
-    if (GEMINI_KEY) {
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-            generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-          }),
-        }
-      );
-
-      if (geminiRes.ok) {
-        const gemData = await geminiRes.json();
-        const content = gemData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (content) {
-          return NextResponse.json({ content, provider: "gemini-2.0-flash" });
-        }
-      }
+    if (result?.content) {
+      return NextResponse.json({ content: result.content, provider: result.model });
     }
 
     return NextResponse.json(
-      { error: "AI service not configured (set MINIMAX_API_KEY or GEMINI_API_KEY)" },
+      { error: "AI service not configured (set OPENROUTER_API_KEY or MINIMAX_API_KEY)" },
       { status: 503 }
     );
   } catch (error: unknown) {

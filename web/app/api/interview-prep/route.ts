@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isMinimaxConfigured, minimaxChat } from "@/lib/minimax";
-
-const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
+import { chatWithFallback } from "@/lib/llm";
 
 const SYSTEM_PROMPT = `You are an expert interview coach. Generate interview preparation questions and talking points.
 
@@ -36,58 +34,29 @@ ${(resumeText || "Not provided").slice(0, 3000)}
 
 Generate the JSON array of interview questions now.`;
 
-    let content = "";
-    let provider = "";
+    const result = await chatWithFallback({
+      system: SYSTEM_PROMPT,
+      user: userPrompt,
+      temperature: 0.5,
+      maxTokens: 4096,
+    });
 
-    if (isMinimaxConfigured()) {
-      const mm = await minimaxChat({
-        system: SYSTEM_PROMPT,
-        user: userPrompt,
-        temperature: 0.5,
-        maxTokens: 4096,
-      });
-      if (mm?.content) {
-        content = mm.content;
-        provider = mm.model;
-      }
-    }
-
-    if (!content && GEMINI_KEY) {
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-            generationConfig: { temperature: 0.5, maxOutputTokens: 4096 },
-          }),
-        }
-      );
-
-      if (geminiRes.ok) {
-        const gemData = await geminiRes.json();
-        content = gemData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        provider = "gemini-2.0-flash";
-      }
-    }
-
-    if (!content) {
+    if (!result?.content) {
       return NextResponse.json(
-        { error: "AI service not configured (set MINIMAX_API_KEY or GEMINI_API_KEY)" },
+        { error: "AI service not configured (set OPENROUTER_API_KEY or MINIMAX_API_KEY)" },
         { status: 503 }
       );
     }
 
-    let parsed = content;
-    const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    let parsed = result.content;
+    const jsonMatch = result.content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
     if (jsonMatch) parsed = jsonMatch[1];
 
     try {
       const questions = JSON.parse(parsed.trim());
-      return NextResponse.json({ questions, provider });
+      return NextResponse.json({ questions, provider: result.model });
     } catch {
-      return NextResponse.json({ questions: [], raw: content, provider });
+      return NextResponse.json({ questions: [], raw: result.content, provider: result.model });
     }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Generation failed";
