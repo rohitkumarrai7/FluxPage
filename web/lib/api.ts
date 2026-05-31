@@ -210,7 +210,26 @@ export const api = {
       }
       const parsed = await parseRes.json();
 
-      const structuredData = parsed.text ? parseResumeText(parsed.text) : undefined;
+      let structuredData = parsed.text ? parseResumeText(parsed.text) : undefined;
+
+      if (parsed.text && parsed.text.length > 50) {
+        try {
+          const llmRes = await fetch("/api/parse-resume-structured", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rawText: parsed.text }),
+          });
+          if (llmRes.ok) {
+            const llmData = await llmRes.json();
+            if (llmData.parsed?.sections?.length > 0) {
+              const { scoreParseQuality } = await import("./sectionHeaders");
+              const regexScore = structuredData ? scoreParseQuality(structuredData) : 0;
+              const llmScore = scoreParseQuality(llmData.parsed);
+              if (llmScore >= regexScore) structuredData = llmData.parsed;
+            }
+          }
+        } catch { /* LLM parse optional */ }
+      }
 
       const res = await apiFetch("/v1/resumes/upload", {
         method: "POST",
@@ -311,6 +330,7 @@ export const api = {
       structuredResume: unknown;
       aiSuggestions: unknown[];
       currentScore: number;
+      templateSlug?: string;
     }) => {
       const res = await fetch(`${API_URL}/v1/drafts/update`, {
         method: "POST",
