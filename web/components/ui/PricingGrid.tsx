@@ -88,7 +88,9 @@ export function PricingGrid({
                 </div>
               )}
               {plan.launchTagline && (
-                <p className="text-sm text-foreground/80 mt-2 font-medium">{plan.launchTagline}</p>
+                <p className="text-xs sm:text-sm text-emerald-900/90 mt-3 font-medium leading-relaxed bg-emerald-50/80 border border-emerald-100 rounded-lg px-3 py-2">
+                  {plan.launchTagline}
+                </p>
               )}
             </div>
             <ul className="space-y-2 mb-6">

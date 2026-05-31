@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Logo, Button, Card, PricingGrid } from "@/components/ui";
+import { Logo, Button, Card, PricingGrid, CeoAgencyCredit } from "@/components/ui";
 import Link from "next/link";
 import {
+  CHROME_EXTENSION_STORE_URL,
   CONTACT_EMAIL_PRIMARY,
   CONTACT_EMAIL_SECONDARY,
   CONTACT_MAILTO_PRIMARY,
@@ -139,11 +140,22 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="sticky top-0 z-50 bg-surface/90 backdrop-blur-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <Logo />
+          <div className="flex flex-col gap-0.5">
+            <Logo />
+            <CeoAgencyCredit variant="header" className="hidden sm:block" />
+          </div>
           <div className="hidden md:flex items-center gap-6">
             <a href="#features" className="text-sm text-muted hover:text-foreground transition-colors">Features</a>
             <a href="#pricing" className="text-sm text-muted hover:text-foreground transition-colors">Pricing</a>
             <a href="#reviews" className="text-sm text-muted hover:text-foreground transition-colors">Reviews</a>
+            <a
+              href={CHROME_EXTENSION_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted hover:text-foreground transition-colors"
+            >
+              Chrome Extension
+            </a>
             {isLoggedIn ? (
               <Button href="/dashboard" size="sm">Dashboard</Button>
             ) : (
@@ -169,9 +181,19 @@ export default function LandingPage() {
         </div>
         {mobileOpen && (
           <div className="md:hidden border-t border-border bg-surface px-4 py-4 space-y-3">
+            <CeoAgencyCredit variant="header" />
             <a href="#features" className="block text-sm text-muted" onClick={() => setMobileOpen(false)}>Features</a>
             <a href="#pricing" className="block text-sm text-muted" onClick={() => setMobileOpen(false)}>Pricing</a>
             <a href="#reviews" className="block text-sm text-muted" onClick={() => setMobileOpen(false)}>Reviews</a>
+            <a
+              href={CHROME_EXTENSION_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-sm text-muted"
+              onClick={() => setMobileOpen(false)}
+            >
+              Chrome Extension
+            </a>
             {isLoggedIn ? (
               <Button href="/dashboard" size="sm" className="w-full">Dashboard</Button>
             ) : (
@@ -404,7 +426,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-8">
             <div className="col-span-2 md:col-span-1">
               <Logo />
               <p className="text-sm text-muted mt-3">AI resume tailoring for modern job seekers.</p>
@@ -415,6 +437,16 @@ export default function LandingPage() {
                 <li><a href="#features" className="hover:text-foreground">Features</a></li>
                 <li><a href="#pricing" className="hover:text-foreground">Pricing</a></li>
                 <li><Link href="/register" className="hover:text-foreground">Get Started</Link></li>
+                <li>
+                  <a
+                    href={CHROME_EXTENSION_STORE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-foreground"
+                  >
+                    Chrome Extension
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
@@ -422,6 +454,25 @@ export default function LandingPage() {
               <ul className="space-y-2 text-sm text-muted">
                 <li><Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
                 <li><Link href="/terms" className="hover:text-foreground">Terms of Service</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Company</h4>
+              <ul className="space-y-2 text-sm text-muted">
+                <li>
+                  <a
+                    href="https://ceo.agency/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="CEO.AGENCY — AI agency for growing businesses"
+                    className="hover:text-foreground"
+                  >
+                    CEO.AGENCY
+                  </a>
+                </li>
+                <li>
+                  <CeoAgencyCredit variant="footer" />
+                </li>
               </ul>
             </div>
             <div>
@@ -440,8 +491,9 @@ export default function LandingPage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-border pt-6 text-xs text-muted">
-            &copy; 2026 Fluxpage. All rights reserved.
+          <div className="border-t border-border pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-muted">
+            <span>&copy; 2026 Fluxpage. All rights reserved.</span>
+            <CeoAgencyCredit variant="footer" />
           </div>
         </div>
       </footer>

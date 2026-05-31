@@ -2,14 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
-import { PageHeader, EmptyState, Button, Card, SpinnerCenter } from "@/components/ui";
-
-interface AnalysisResult {
-  score: number;
-  matchedKeywords: string[];
-  missingKeywords: string[];
-  suggestions: string[];
-}
+import { PageHeader, EmptyState, Button, Card, SpinnerCenter, AtsEnterpriseResults } from "@/components/ui";
+import type { AtsAnalysisResult } from "@/lib/atsNormalize";
 
 export default function ResumesPage() {
   const [resumes, setResumes] = useState<any[]>([]);
@@ -17,7 +11,7 @@ export default function ResumesPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
-  const [analysisMap, setAnalysisMap] = useState<Record<string, AnalysisResult | null>>({});
+  const [analysisMap, setAnalysisMap] = useState<Record<string, AtsAnalysisResult | null>>({});
   const [jdForAnalysis, setJdForAnalysis] = useState("");
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -86,21 +80,10 @@ export default function ResumesPage() {
         alert("This resume has no text content. Re-upload with text content.");
         return;
       }
-      const result = await api.ats.analyze(resumeText, jdForAnalysis);
+      const result = await api.ats.analyzeEnterprise(resumeText, jdForAnalysis);
       setAnalysisMap((prev) => ({
         ...prev,
-        [resume.id]: {
-          score: result.score || 0,
-          matchedKeywords: (result.matchedKeywords || []).map((k: any) =>
-            typeof k === "string" ? k : k.keyword || ""
-          ),
-          missingKeywords: (result.missingKeywords || []).map((k: any) =>
-            typeof k === "string" ? k : k.keyword || ""
-          ),
-          suggestions: (result.suggestions || []).map((s: any) =>
-            typeof s === "string" ? s : s.message || ""
-          ),
-        },
+        [resume.id]: result,
       }));
       await api.resumes.update(resume.id, { lastAtsScore: result.score || 0 });
       await loadResumes();
@@ -187,6 +170,11 @@ export default function ResumesPage() {
                 {resume.textPreview && (
                   <p className="mt-3 text-xs text-slate-400 line-clamp-2">{resume.textPreview.slice(0, 150)}</p>
                 )}
+                {resume.structuredData?.skills?.length > 0 && (
+                  <p className="mt-2 text-xs text-muted">
+                    Parsed: {resume.structuredData.totalExperienceYears || 0}y experience · {resume.structuredData.skills.length} skills · {resume.structuredData.seniorityLevel || "unknown"} level
+                  </p>
+                )}
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-xs text-slate-300">
                     {resume.fileSize ? `${(resume.fileSize / 1024).toFixed(1)} KB` : ""}
@@ -213,31 +201,7 @@ export default function ResumesPage() {
 
                 {analysis && (
                   <div className="mt-3 pt-3 border-t border-slate-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-xl font-black ${scoreColor}`}>{analysis.score}</span>
-                      <span className="text-xs text-slate-400">/100</span>
-                      <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
-                        analysis.score >= 75 ? "bg-green-50 text-green-700" :
-                        analysis.score >= 50 ? "bg-amber-50 text-amber-700" :
-                        "bg-red-50 text-red-700"
-                      }`}>
-                        {analysis.score >= 75 ? "Good" : analysis.score >= 50 ? "Fair" : "Low"}
-                      </span>
-                    </div>
-                    {analysis.matchedKeywords.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {analysis.matchedKeywords.slice(0, 6).map((kw) => (
-                          <span key={kw} className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">{kw}</span>
-                        ))}
-                      </div>
-                    )}
-                    {analysis.missingKeywords.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {analysis.missingKeywords.slice(0, 6).map((kw) => (
-                          <span key={kw} className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-full">{kw}</span>
-                        ))}
-                      </div>
-                    )}
+                    <AtsEnterpriseResults result={analysis} compact />
                   </div>
                 )}
               </div>

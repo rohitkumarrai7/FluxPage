@@ -3,7 +3,8 @@
 import { useState, useRef, Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { Logo, Card, Button, SpinnerCenter } from "@/components/ui";
+import { CHROME_EXTENSION_STORE_URL } from "@/lib/contact";
+import { Logo, Card, Button, SpinnerCenter, CeoAgencyCredit } from "@/components/ui";
 
 const STEPS = ["Welcome", "Upload", "Review", "Extension", "Done"] as const;
 
@@ -85,6 +86,7 @@ function OnboardingContent() {
         <div className="mb-8">
           <Logo />
           <p className="text-sm text-muted mt-2">Set up your account</p>
+          <CeoAgencyCredit variant="header" className="mt-2" />
         </div>
 
         <div className="flex gap-2 mb-8">
@@ -173,10 +175,35 @@ function OnboardingContent() {
           <Card padding="lg">
             <h2 className="text-xl font-bold text-foreground mb-2">Install the Chrome extension</h2>
             <p className="text-muted text-sm mb-6">
-              Tailor resumes directly from LinkedIn, Indeed, Naukri, and more. One click from any job page.
+              Tailor resumes directly from LinkedIn, Indeed, Naukri, and more. After you sign in once in the extension,
+              your onboarding resume syncs automatically — no need to upload it again.
             </p>
-            <div className="bg-slate-50 rounded-lg p-4 mb-6 text-sm text-foreground border border-border">
-              Load the extension from <code className="text-primary font-mono text-xs">chrome://extensions</code> → Developer mode → Load unpacked → select this repo folder.
+            <div className="bg-slate-50 rounded-lg p-4 mb-6 border border-border">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Fluxpage Chrome Extension</div>
+                  <div className="text-xs text-muted">AI Job Assistant for Chrome</div>
+                </div>
+              </div>
+              <a
+                href={CHROME_EXTENSION_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+                Add to Chrome — Free
+              </a>
+              <p className="text-xs text-muted mt-3 text-center">
+                Or load manually: <code className="text-primary font-mono text-xs">chrome://extensions</code> → Developer mode → Load unpacked
+              </p>
             </div>
             <div className="flex gap-3">
               <Button onClick={() => setStep(4)} className="flex-1">I installed it</Button>

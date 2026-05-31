@@ -3,25 +3,21 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
 import Link from "next/link";
-import { PageHeader, StatCard, Card, Button, Badge, SpinnerCenter } from "@/components/ui";
-
-interface AnalysisResult {
-  score: number;
-  matchedKeywords: string[];
-  missingKeywords: string[];
-  suggestions: string[];
-}
+import { CHROME_EXTENSION_STORE_URL } from "@/lib/contact";
+import { PageHeader, StatCard, Card, Button, Badge, SpinnerCenter, AtsEnterpriseResults } from "@/components/ui";
+import type { AtsAnalysisResult } from "@/lib/atsNormalize";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ jobs: 0, resumes: 0, avgScore: 0 });
   const [recentJobs, setRecentJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingResume, setUploadingResume] = useState(false);
-  const [atsResult, setAtsResult] = useState<AnalysisResult | null>(null);
+  const [atsResult, setAtsResult] = useState<AtsAnalysisResult | null>(null);
   const [atsJobDescription, setAtsJobDescription] = useState("");
   const [analyzingAts, setAnalyzingAts] = useState(false);
   const [atsResumes, setAtsResumes] = useState<any[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+  const [planInfo, setPlanInfo] = useState<{ tier: string; usage: any } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,6 +30,7 @@ export default function DashboardPage() {
         api.jobs.list(),
         api.resumes.list(),
       ]);
+      const profile = api.auth.getUser();
       const jobs = jobsData.jobs || [];
       const resumes = resumesData.resumes || [];
       setAtsResumes(resumes);
@@ -50,6 +47,13 @@ export default function DashboardPage() {
         avgScore: scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0,
       });
       setRecentJobs(jobs.slice(0, 5));
+      if (profile) {
+        setPlanInfo({ tier: profile.tier || "free", usage: null });
+      }
+      api.auth.getProfile().then((fresh) => {
+        setPlanInfo({ tier: fresh.tier || "free", usage: fresh.usage || null });
+        api.auth.updateStoredTier(fresh.tier);
+      }).catch(() => {});
     } catch (err) {
       console.error("Failed to load dashboard:", err);
     } finally {
@@ -60,6 +64,14 @@ export default function DashboardPage() {
   async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (planInfo?.usage) {
+      const { resumesCount, resumesLimit } = planInfo.usage;
+      if (resumesLimit >= 0 && resumesCount >= resumesLimit) {
+        alert(`Resume limit reached (${resumesLimit} on ${planInfo.tier} plan). Delete a resume or upgrade your plan.`);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
+    }
     setUploadingResume(true);
     try {
       await api.resumes.upload(file);
@@ -84,19 +96,8 @@ export default function DashboardPage() {
         setAnalyzingAts(false);
         return;
       }
-      const result = await api.ats.analyze(resumeText, atsJobDescription);
-      setAtsResult({
-        score: result.score || 0,
-        matchedKeywords: (result.matchedKeywords || []).map((k: any) =>
-          typeof k === "string" ? k : k.keyword || ""
-        ),
-        missingKeywords: (result.missingKeywords || []).map((k: any) =>
-          typeof k === "string" ? k : k.keyword || ""
-        ),
-        suggestions: (result.suggestions || []).map((s: any) =>
-          typeof s === "string" ? s : s.message || ""
-        ),
-      });
+      const result = await api.ats.analyzeEnterprise(resumeText, atsJobDescription);
+      setAtsResult(result);
     } catch (err: any) {
       alert(err.message || "ATS analysis failed");
     } finally {
@@ -108,10 +109,6 @@ export default function DashboardPage() {
     return <SpinnerCenter />;
   }
 
-  const scoreColor = atsResult
-    ? atsResult.score >= 75 ? "text-green-600" : atsResult.score >= 50 ? "text-amber-500" : "text-red-500"
-    : "text-slate-400";
-
   return (
     <div>
       <PageHeader title="Dashboard" subtitle="Your resume optimization overview" />
@@ -121,6 +118,53 @@ export default function DashboardPage() {
         <StatCard label="Resumes" value={stats.resumes} icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         <StatCard label="Avg ATS Score" value={stats.avgScore > 0 ? stats.avgScore : "—"} icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </div>
+
+      {planInfo && (
+        <Card className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-semibold text-foreground capitalize">{planInfo.tier} Plan</span>
+                <Badge variant={planInfo.tier === "premium" ? "warning" : planInfo.tier === "pro" ? "primary" : "default"} className="capitalize text-xs">
+                  {planInfo.tier}
+                </Badge>
+              </div>
+              {planInfo.usage && (
+                <div className="flex flex-wrap gap-4 text-xs text-muted">
+                  <span>
+                    Tailors: {planInfo.usage.tailorsThisMonth || 0}/{planInfo.usage.tailorsLimit < 0 ? "∞" : planInfo.usage.tailorsLimit}
+                  </span>
+                  <span>
+                    Resumes: {planInfo.usage.resumesCount || 0}/{planInfo.usage.resumesLimit < 0 ? "∞" : planInfo.usage.resumesLimit}
+                  </span>
+                  <span>
+                    Cover letters: {planInfo.usage.coverLettersEnabled ? "Enabled" : "Pro+"}
+                  </span>
+                </div>
+              )}
+            </div>
+            {planInfo.tier === "free" && (
+              <Button href="/dashboard/billing" size="sm" variant="primary">Upgrade Plan</Button>
+            )}
+          </div>
+          {planInfo.usage && planInfo.usage.tailorsLimit >= 0 && (
+            <div className="mt-3">
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    (planInfo.usage.tailorsThisMonth || 0) >= planInfo.usage.tailorsLimit
+                      ? "bg-red-500"
+                      : (planInfo.usage.tailorsThisMonth || 0) >= planInfo.usage.tailorsLimit * 0.8
+                      ? "bg-amber-500"
+                      : "bg-primary"
+                  }`}
+                  style={{ width: `${Math.min(100, ((planInfo.usage.tailorsThisMonth || 0) / planInfo.usage.tailorsLimit) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <Card>
@@ -179,53 +223,7 @@ export default function DashboardPage() {
 
             {atsResult && (
               <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className={`text-4xl font-black ${scoreColor}`}>{atsResult.score}</div>
-                  <div className="text-sm text-slate-500">/100 ATS Score</div>
-                  <span className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold ${
-                    atsResult.score >= 75 ? "bg-green-50 text-green-700" :
-                    atsResult.score >= 50 ? "bg-amber-50 text-amber-700" :
-                    "bg-red-50 text-red-700"
-                  }`}>
-                    {atsResult.score >= 75 ? "Good Match" : atsResult.score >= 50 ? "Fair Match" : "Low Match"}
-                  </span>
-                </div>
-
-                {atsResult.matchedKeywords.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium text-green-700 mb-1">Matched Keywords ({atsResult.matchedKeywords.length})</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {atsResult.matchedKeywords.slice(0, 15).map((kw) => (
-                        <span key={kw} className="text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full">{kw}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {atsResult.missingKeywords.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium text-amber-700 mb-1">Missing Keywords ({atsResult.missingKeywords.length})</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {atsResult.missingKeywords.slice(0, 15).map((kw) => (
-                        <span key={kw} className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full">{kw}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {atsResult.suggestions.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-slate-700 mb-1">Suggestions</div>
-                    <ul className="text-xs text-slate-600 space-y-1">
-                      {atsResult.suggestions.map((s, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="text-primary flex-shrink-0">&rarr;</span>
-                          <span>{s}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <AtsEnterpriseResults result={atsResult} />
               </div>
             )}
           </div>
@@ -262,6 +260,17 @@ export default function DashboardPage() {
             <h2 className="text-lg font-bold text-foreground mb-4">Quick Actions</h2>
             <div className="space-y-3">
               <Button href="/dashboard/resumes" className="w-full">Upload Resume</Button>
+              <a
+                href={CHROME_EXTENSION_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium rounded-lg text-center hover:bg-emerald-100 transition-all text-sm"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+                Get Chrome Extension
+              </a>
               <div className="grid grid-cols-3 gap-2">
                 <a href="https://www.linkedin.com/jobs/" target="_blank" rel="noopener" className="block w-full py-2.5 px-3 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg text-center hover:bg-slate-50 transition-all text-xs">
                   LinkedIn

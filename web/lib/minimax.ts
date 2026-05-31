@@ -10,6 +10,15 @@ export function isMinimaxConfigured(): boolean {
   return !!MINIMAX_API_KEY;
 }
 
+function stripThinkingTags(text: string): string {
+  const thinkBlock = new RegExp("<think[\\s\\S]*?<\\/think>", "gi");
+  const reasoningBlock = new RegExp(
+    "<redacted_reasoning[\\s\\S]*?<\\/redacted_reasoning>",
+    "gi"
+  );
+  return text.replace(thinkBlock, "").replace(reasoningBlock, "").trim();
+}
+
 export async function minimaxChat(params: {
   system: string;
   user: string;
@@ -42,7 +51,10 @@ export async function minimaxChat(params: {
   }
 
   const data = await res.json();
-  const content = data.choices?.[0]?.message?.content?.trim() || "";
+  let content = data.choices?.[0]?.message?.content?.trim() || "";
+  if (!content) return null;
+
+  content = stripThinkingTags(content);
   if (!content) return null;
 
   return { content, model: MINIMAX_MODEL };

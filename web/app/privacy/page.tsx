@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "@/components/ui";
+import { Logo, CeoAgencyCredit } from "@/components/ui";
 import {
   CONTACT_EMAIL_PRIMARY,
   CONTACT_EMAIL_SECONDARY,
@@ -16,11 +16,14 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-between">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <Link href="/" className="text-sm text-muted hover:text-foreground">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-between gap-4">
+          <div>
+            <Link href="/">
+              <Logo />
+            </Link>
+            <CeoAgencyCredit variant="header" className="mt-2" />
+          </div>
+          <Link href="/" className="text-sm text-muted hover:text-foreground shrink-0">
             Back to home
           </Link>
         </div>
@@ -98,6 +101,12 @@ export default function PrivacyPage() {
           </p>
         </section>
       </main>
+      <footer className="border-t border-border bg-surface">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p className="text-xs text-muted">&copy; 2026 Fluxpage. All rights reserved.</p>
+          <CeoAgencyCredit variant="footer" />
+        </div>
+      </footer>
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { ResumePreview } from "@/components/resume/ResumePreview";
-import { downloadResumePdf } from "@/components/resume/ResumePDF";
 import {
   applySuggestionToResume,
   parseResumeText,
@@ -34,25 +33,17 @@ function TailorContent() {
   const [isGeneratingCL, setIsGeneratingCL] = useState(false);
   const [template, setTemplate] = useState<"classic" | "compact" | "modern">("classic");
 
-  const rescore = useCallback(async (nextResume: StructuredResume) => {
-    if (!jobDescription) return;
+  const rescore = useCallback(async (nextResume: StructuredResume): Promise<number> => {
+    if (!jobDescription) return score ?? 0;
     const text = structuredResumeToText(nextResume);
     try {
-      const result = await api.ats.analyze(text, jobDescription);
+      const result = await api.ats.analyzeEnterprise(text, jobDescription);
       setScore(result.score || 0);
-      setMatchedKeywords(
-        (result.matchedKeywords || []).map((k: unknown) =>
-          typeof k === "string" ? k : (k as { keyword: string }).keyword || ""
-        )
-      );
-      setMissingKeywords(
-        (result.missingKeywords || []).map((k: unknown) =>
-          typeof k === "string" ? k : (k as { keyword: string }).keyword || ""
-        )
-      );
+      setMatchedKeywords(result.matchedKeywords || []);
+      setMissingKeywords(result.missingKeywords || []);
       return result.score || 0;
     } catch {
-      return score || 0;
+      return score ?? 0;
     }
   }, [jobDescription, score]);
 
@@ -182,6 +173,7 @@ function TailorContent() {
 
   async function downloadPdf() {
     if (!resume) return;
+    const { downloadResumePdf } = await import("@/components/resume/ResumePDF");
     await downloadResumePdf(resume, template, "tailored-resume.pdf");
   }
 

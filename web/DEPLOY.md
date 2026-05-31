@@ -127,9 +127,9 @@ In **Clerk → Domains / Redirect URLs**, add production:
 | `RAZORPAY_PLAN_PRO_AMOUNT` | `19900` (paise, ₹199) |
 | `RAZORPAY_PLAN_PREMIUM_AMOUNT` | `39900` (paise, ₹399) |
 | `NEXT_PUBLIC_RAZORPAY_PRO_DISPLAY` | `₹199` |
-| `NEXT_PUBLIC_RAZORPAY_PRO_ORIGINAL_DISPLAY` | `₹999` (strikethrough on UI) |
+| `NEXT_PUBLIC_RAZORPAY_PRO_ORIGINAL_DISPLAY` | `₹499` (strikethrough on UI) |
 | `NEXT_PUBLIC_RAZORPAY_PREMIUM_DISPLAY` | `₹399` |
-| `NEXT_PUBLIC_RAZORPAY_PREMIUM_ORIGINAL_DISPLAY` | `₹2,499` (strikethrough on UI) |
+| `NEXT_PUBLIC_RAZORPAY_PREMIUM_ORIGINAL_DISPLAY` | `₹999` (strikethrough on UI) |
 
 **Razorpay webhook URL:**
 

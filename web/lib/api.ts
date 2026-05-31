@@ -1,4 +1,5 @@
 import { parseResumeText } from "./resumeParser";
+import { normalizeAtsResponse, type AtsAnalysisResult } from "./atsNormalize";
 
 import { CONVEX_HTTP_URL } from "./convexDeployment";
 
@@ -26,6 +27,7 @@ function clearTokens() {
   localStorage.removeItem("rf_access_token");
   localStorage.removeItem("rf_refresh_token");
   localStorage.removeItem("rf_user");
+  invalidateProfileCache();
 }
 
 function setUser(user: User) {
@@ -37,6 +39,13 @@ function getStoredUser(): User | null {
   const raw = localStorage.getItem("rf_user");
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
+}
+
+let profileCache: { data: Record<string, unknown>; ts: number } | null = null;
+const PROFILE_CACHE_MS = 30_000;
+
+function invalidateProfileCache() {
+  profileCache = null;
 }
 
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -142,7 +151,14 @@ export const api = {
       const user = getStoredUser();
       if (user) setUser({ ...user, tier });
     },
-    getProfile: async () => {
+    getProfile: async (options?: { force?: boolean }) => {
+      if (
+        !options?.force &&
+        profileCache &&
+        Date.now() - profileCache.ts < PROFILE_CACHE_MS
+      ) {
+        return profileCache.data;
+      }
       const res = await apiFetch("/v1/auth/profile");
       if (!res.ok) throw new Error("Failed to fetch profile");
       const profile = await res.json();
@@ -150,6 +166,7 @@ export const api = {
       if (stored) {
         setUser({ ...stored, onboardingCompleted: profile.onboardingCompleted });
       }
+      profileCache = { data: profile, ts: Date.now() };
       return profile;
     },
     completeOnboarding: async () => {
@@ -305,13 +322,21 @@ export const api = {
     },
   },
   ats: {
-    analyze: async (resumeText: string, jobDescription: string) => {
+    analyze: async (resumeText: string, jobDescription: string): Promise<AtsAnalysisResult> => {
       const res = await apiFetch("/v1/ats/analyze", {
         method: "POST",
         body: JSON.stringify({ resumeText, jobDescription }),
       });
       if (!res.ok) throw new Error("Analysis failed");
-      return res.json();
+      return normalizeAtsResponse(await res.json());
+    },
+    analyzeEnterprise: async (resumeText: string, jobDescription: string): Promise<AtsAnalysisResult> => {
+      const res = await apiFetch("/v1/ats/analyze-enterprise", {
+        method: "POST",
+        body: JSON.stringify({ resumeText, jobDescription }),
+      });
+      if (!res.ok) throw new Error("Enterprise analysis failed");
+      return normalizeAtsResponse(await res.json());
     },
   },
   tailoring: {

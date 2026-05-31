@@ -1,4 +1,5 @@
 import { Logo } from "@/components/ui/Logo";
+import { CeoAgencyCredit } from "@/components/ui/CeoAgencyCredit";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -47,12 +48,16 @@ export function AuthLayout({ children, title = "Tailor smarter, land faster", su
           </div>
           <p className="text-sm text-muted mt-4">Average +27 point ATS improvement across users</p>
         </div>
-        <p className="text-xs text-muted">&copy; 2026 Fluxpage. All rights reserved.</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-muted">&copy; 2026 Fluxpage. All rights reserved.</p>
+          <CeoAgencyCredit variant="footer" />
+        </div>
       </div>
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-[440px]">
           <div className="lg:hidden mb-8 text-center">
             <Logo size="md" className="justify-center" />
+            <CeoAgencyCredit variant="header" className="mt-2" />
           </div>
           {children}
         </div>
