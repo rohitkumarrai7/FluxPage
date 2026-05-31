@@ -1,46 +1,95 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState } from "react";
 import type { StructuredResume } from "@/lib/resumeParser";
+import type { TemplateVariant } from "./templates";
+import { ResumeLayout } from "./templates/layouts";
+import { MIN_READABLE_SCALE, previewScaleFromContent } from "@/lib/resumeFit";
 
 interface Props {
   resume: StructuredResume;
-  template?: "classic" | "compact" | "modern";
+  template?: TemplateVariant;
+  fontSize?: number;
+  lineSpacing?: number;
+  fitOnePage?: boolean;
 }
 
-export function ResumePreview({ resume, template = "classic" }: Props) {
-  const accent =
-    template === "modern" ? "#6366F1" : template === "compact" ? "#2563EB" : "#1E3A5F";
+export function ResumePreview({
+  resume,
+  template = "classic",
+  fontSize = 10,
+  lineSpacing = 1.2,
+  fitOnePage = true,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [fitScale, setFitScale] = useState(1);
+
+  const fontScale = fontSize / 10;
+  const compact = fitOnePage;
+
+  const layoutProps = { resume, template, compact };
+
+  const recalculateScale = () => {
+    const container = containerRef.current;
+    const content = measureRef.current;
+    if (!container || !content) return;
+
+    const containerH = container.clientHeight;
+    const contentH = content.scrollHeight;
+    if (containerH <= 0 || contentH <= 0) return;
+
+    // DOM measurement only — avoids double-shrink from heuristics
+    setFitScale(previewScaleFromContent(contentH, containerH, MIN_READABLE_SCALE));
+  };
+
+  useLayoutEffect(() => {
+    if (!fitOnePage) {
+      setFitScale(1);
+      return;
+    }
+    recalculateScale();
+  }, [resume, template, fontSize, lineSpacing, fitOnePage, fontScale]);
+
+  useLayoutEffect(() => {
+    if (!fitOnePage) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(recalculateScale);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [resume, template, fontSize, lineSpacing, fitOnePage, fontScale]);
 
   return (
-    <div className="bg-white text-slate-900 rounded-lg shadow-lg p-8 min-h-full text-sm leading-relaxed">
-      <div className="text-center border-b pb-4 mb-4" style={{ borderColor: accent }}>
-        <h1 className="text-2xl font-bold" style={{ color: accent }}>
-          {resume.contact.name || "Your Name"}
-        </h1>
-        <div className="text-xs text-slate-600 mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
-          {resume.contact.email && <span>{resume.contact.email}</span>}
-          {resume.contact.phone && <span>{resume.contact.phone}</span>}
-          {resume.contact.linkedin && <span>{resume.contact.linkedin}</span>}
-        </div>
+    <div
+      ref={containerRef}
+      className="relative shadow-xl border border-slate-200 bg-white mx-auto w-full"
+      style={{ aspectRatio: "210 / 297", overflow: "hidden" }}
+    >
+      <div
+        ref={measureRef}
+        aria-hidden
+        className="absolute top-0 left-0 w-full pointer-events-none select-none"
+        style={{
+          visibility: "hidden",
+          fontSize: `${fontScale * 100}%`,
+          lineHeight: lineSpacing,
+        }}
+      >
+        <ResumeLayout {...layoutProps} />
       </div>
 
-      {resume.sections.map((section) => (
-        <div key={section.id} className="mb-4">
-          <h2
-            className="text-sm font-bold uppercase tracking-wide mb-2 pb-1 border-b"
-            style={{ color: accent, borderColor: `${accent}33` }}
-          >
-            {section.heading}
-          </h2>
-          <ul className="space-y-1.5">
-            {section.items.map((item) => (
-              <li key={item.id} className="text-slate-700 pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-slate-400">
-                {item.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      <div
+        className="absolute top-0 left-0 w-full origin-top-left"
+        style={{
+          transform: fitScale < 1 ? `scale(${fitScale})` : undefined,
+          transformOrigin: "top left",
+          fontSize: `${fontScale * 100}%`,
+          lineHeight: lineSpacing,
+        }}
+      >
+        <ResumeLayout {...layoutProps} />
+      </div>
     </div>
   );
 }
