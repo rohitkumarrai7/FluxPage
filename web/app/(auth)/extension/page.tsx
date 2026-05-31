@@ -3,7 +3,9 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@clerk/nextjs";
 import { api } from "@/lib/api";
+import { clerkConfigured } from "@/lib/clerkConfig";
 import { AuthLayout, Button, Card, Logo, Spinner } from "@/components/ui";
 
 const inputClass =
@@ -12,6 +14,7 @@ const inputClass =
 function ExtensionAuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isLoaded, isSignedIn } = useAuth();
   const [status, setStatus] = useState<"login" | "register" | "redirecting">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,9 +25,16 @@ function ExtensionAuthContent() {
   useEffect(() => {
     if (api.auth.isLoggedIn()) {
       handleRedirect();
+      return;
+    }
+
+    if (!clerkConfigured || !isLoaded) return;
+
+    if (isSignedIn && redirect) {
+      router.replace(`/auth/sync?redirect=${encodeURIComponent(redirect)}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoaded, isSignedIn, redirect]);
 
   function handleRedirect() {
     const token = localStorage.getItem("rf_access_token") || "";
@@ -69,35 +79,47 @@ function ExtensionAuthContent() {
       <AuthLayout title="Connecting extension" subtitle="Redirecting you back to the Chrome extension.">
         <div className="text-center">
           <Spinner size="lg" className="mx-auto mb-4" />
-          <p className="text-muted text-sm">You&apos;ll be redirected automatically</p>
+          <p className="text-muted text-sm">Your account and resumes will sync automatically.</p>
         </div>
       </AuthLayout>
     );
   }
 
+  const clerkLoginHref = redirect
+    ? `/login?redirect=${encodeURIComponent(redirect)}`
+    : "/login";
+
   return (
     <AuthLayout
       title="Connect your extension"
-      subtitle="Sign in to link the Fluxpage Chrome extension to your account."
+      subtitle="Sign in to link Fluxpage to Chrome. Resumes from onboarding sync automatically."
     >
       <div className="text-center mb-6 lg:hidden">
         <Logo className="justify-center mb-4" />
-        <p className="text-muted text-sm">
-          {status === "register" ? "Create account to connect extension" : "Sign in to connect the Chrome extension"}
-        </p>
+        <p className="text-muted text-sm">Sign in once — your uploaded resume appears in the extension.</p>
       </div>
 
-      <p className="text-center text-sm text-muted mb-4 hidden lg:block">
-        Prefer Clerk sign-in?{" "}
-        <Link
-          href={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login"}
-          className="text-primary hover:text-primary-hover font-medium"
-        >
-          Use secure login
-        </Link>
-      </p>
+      {clerkConfigured && redirect && (
+        <Card padding="md" className="mb-4">
+          <p className="text-sm text-muted mb-4">
+            Use the same Fluxpage account you used during onboarding. Cloud resumes sync after connect.
+          </p>
+          <Link href={clerkLoginHref}>
+            <Button className="w-full">Sign in &amp; connect extension</Button>
+          </Link>
+        </Card>
+      )}
 
-      {status === "login" ? (
+      {!clerkConfigured && (
+        <p className="text-center text-sm text-muted mb-4 hidden lg:block">
+          Prefer Clerk sign-in?{" "}
+          <Link href={clerkLoginHref} className="text-primary hover:text-primary-hover font-medium">
+            Use secure login
+          </Link>
+        </p>
+      )}
+
+      {(!clerkConfigured || !redirect) && (status === "login" ? (
         <Card padding="md">
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
@@ -147,7 +169,7 @@ function ExtensionAuthContent() {
             </p>
           </form>
         </Card>
-      )}
+      ))}
     </AuthLayout>
   );
 }

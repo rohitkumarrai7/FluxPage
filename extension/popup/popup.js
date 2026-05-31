@@ -21,16 +21,23 @@
     var btnEl = $("#authBtn");
 
     if (auth && auth.token && auth.user) {
-      infoEl.textContent = "Logged in as " + (auth.user.email || "");
+      var label = auth.user.name
+        ? auth.user.name + " · " + (auth.user.email || "")
+        : "Connected · " + (auth.user.email || "");
+      infoEl.textContent = label;
       btnEl.textContent = "Logout";
       btnEl.onclick = function () {
-        chrome.storage.local.remove(STORAGE.auth, function () {
+        chrome.runtime.sendMessage({ type: "LOGOUT" }, function () {
           loadAuthStatus();
+          loadStats();
         });
       };
+      chrome.runtime.sendMessage({ type: "SYNC_CLOUD_RESUMES" }, function () {
+        loadStats();
+      });
     } else {
       infoEl.textContent = "Not logged in";
-      btnEl.textContent = "Login";
+      btnEl.textContent = "Connect account";
       btnEl.onclick = function () {
         chrome.runtime.sendMessage({ type: "LOGIN" });
       };

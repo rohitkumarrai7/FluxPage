@@ -21,8 +21,8 @@ var DEFAULT_SETTINGS = {
 
 var _cfg = (typeof globalThis !== "undefined" && globalThis.__RESUMOD_CONFIG__) || {};
 var API_BASE = _cfg.API_BASE || "https://stoic-caiman-320.convex.site";
-var WEB_BASE = _cfg.WEB_BASE || "http://localhost:3000";
-var LOCAL_PDF_API = _cfg.LOCAL_PDF_API || "http://localhost:8000";
+var WEB_BASE = _cfg.WEB_BASE || "https://www.fluxpage.com";
+var LOCAL_PDF_API = _cfg.LOCAL_PDF_API || "https://stoic-caiman-320.convex.site";
 
 chrome.runtime.onInstalled.addListener(async function () {
   var cur = await chrome.storage.local.get([STORAGE.settings]);
@@ -130,6 +130,11 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
           sendResponse({ ok: true, data: cloudResumes });
           break;
         }
+        case "SYNC_CLOUD_RESUMES": {
+          var syncResult = await syncCloudResumes();
+          sendResponse(syncResult);
+          break;
+        }
         case "DELETE_JOB": {
           await deleteJob((msg.payload || {}).jobId);
           sendResponse({ ok: true });
@@ -166,12 +171,17 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
         }
         case "LOGIN": {
           var callbackUrl = chrome.runtime.getURL("callback.html");
-          var loginUrl = WEB_BASE + "/extension?redirect=" + encodeURIComponent(callbackUrl);
+          var loginUrl = WEB_BASE + "/login?redirect=" + encodeURIComponent(callbackUrl);
           chrome.tabs.create({ url: loginUrl });
           sendResponse({ ok: true });
           break;
         }
         case "LOGOUT": {
+          var resumeStored = await chrome.storage.local.get([STORAGE.resumes]);
+          var localOnly = (resumeStored[STORAGE.resumes] || []).filter(function (r) {
+            return !r.cloudId && String(r.id || "").indexOf("cloud_") !== 0;
+          });
+          await chrome.storage.local.set({ rf_resumes: localOnly });
           await chrome.storage.local.remove(STORAGE.auth);
           sendResponse({ ok: true });
           break;
@@ -532,6 +542,67 @@ async function fetchCloudResumes() {
   }
 }
 
+async function syncCloudResumes() {
+  try {
+    var auth = await getAuth();
+    if (!auth || !auth.token) {
+      return { ok: false, error: "Not authenticated", added: 0, total: 0 };
+    }
+
+    var cloudList = await fetchCloudResumes();
+    if (!Array.isArray(cloudList)) {
+      return { ok: false, error: "Invalid resume list", added: 0, total: 0 };
+    }
+
+    var stored = await chrome.storage.local.get([STORAGE.resumes]);
+    var local = stored[STORAGE.resumes] || [];
+    var merged = local.filter(function (r) {
+      return !r.cloudId && String(r.id || "").indexOf("cloud_") !== 0;
+    });
+    var added = 0;
+
+    cloudList.forEach(function (cloud) {
+      if (!cloud || !cloud.rawText) return;
+      var exists = merged.some(function (r) {
+        return r.cloudId === cloud.id || r.id === "cloud_" + cloud.id;
+      });
+      if (exists) return;
+      merged.push({
+        id: "cloud_" + cloud.id,
+        cloudId: cloud.id,
+        filename: cloud.filename || "resume.txt",
+        mimeType: cloud.mimeType || "text/plain",
+        size: cloud.fileSize || cloud.rawText.length,
+        base64: "",
+        textPreview: cloud.textPreview || cloud.rawText.slice(0, 20000),
+        extractedText: cloud.rawText,
+        uploadedAt: cloud.createdAt || Date.now(),
+        label: cloud.label || cloud.filename || "Cloud resume",
+        isDefault: !!cloud.isDefault && merged.every(function (r) { return !r.isDefault; }),
+        syncStatus: "synced"
+      });
+      added++;
+    });
+
+    if (merged.length > 0 && !merged.some(function (r) { return r.isDefault; })) {
+      merged[0].isDefault = true;
+    }
+
+    await chrome.storage.local.set({ rf_resumes: merged });
+    return { ok: true, added: added, total: merged.length };
+  } catch (err) {
+    return { ok: false, error: err.message || "Sync failed", added: 0, total: 0 };
+  }
+}
+
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area !== "local" || !changes[STORAGE.auth]) return;
+  var auth = changes[STORAGE.auth].newValue;
+  if (auth && auth.token) {
+    syncCloudResumes().catch(function () {});
+  }
+});
+
 async function fetchSavedJobs() {
   try {
     var headers = await authHeaders();
@@ -628,7 +699,7 @@ async function analyzeJob(ctx) {
     resume = resumes.find(function (r) { return r.isDefault; }) || resumes[0];
   }
 
-  if (!resume || !resume.base64) {
+  if (!resume || (!resume.base64 && !resume.extractedText && !resume.textPreview)) {
     throw new Error("Upload your resume in the sidebar first.");
   }
 
@@ -663,7 +734,7 @@ async function analyzeJob(ctx) {
 }
 
 async function callAnalyzeApi(settings, payload) {
-  var resumeText = payload.resume.textPreview || "";
+  var resumeText = payload.resume.extractedText || payload.resume.textPreview || "";
   var body = {
     resumeText: resumeText,
     jobDescription: payload.jobDescription,
@@ -697,6 +768,11 @@ async function callAnalyzeApi(settings, payload) {
     missingKeywords: (data.missingKeywords || []).map(function (k) { return typeof k === "string" ? k : (k.keyword || ""); }),
     suggestions: (data.suggestions || []).map(function (s) { return typeof s === "string" ? s : s.message; }),
     breakdown: data.breakdown || null,
+    passedKnockouts: data.passedKnockouts !== false,
+    knockoutDetails: data.knockoutDetails || null,
+    relatedMatches: data.relatedMatches || [],
+    parsedResume: data.parsedResume || null,
+    parsedJD: data.parsedJD || null,
     estimatedAtsPassRate: data.estimatedAtsPassRate || "medium"
   };
 }

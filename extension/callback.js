@@ -46,7 +46,9 @@
     };
 
     chrome.storage.local.set({ rf_auth: authData }, function () {
-      onSuccess(authData.user.email);
+      chrome.runtime.sendMessage({ type: "SYNC_CLOUD_RESUMES" }, function () {
+        onSuccess(authData.user.email);
+      });
     });
   })
   .catch(function (err) {
@@ -60,7 +62,9 @@
     };
 
     chrome.storage.local.set({ rf_auth: authData }, function () {
-      onSuccess("");
+      chrome.runtime.sendMessage({ type: "SYNC_CLOUD_RESUMES" }, function () {
+        onSuccess("");
+      });
     });
   });
 

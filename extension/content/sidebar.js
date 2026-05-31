@@ -422,6 +422,12 @@
 
   async function onPickResume(e) {
     hideError();
+    var planErr = checkPlanLimit("upload_resume");
+    if (planErr) {
+      showError(planErr);
+      e.target.value = "";
+      return;
+    }
     var fileInput = e.target;
     var file = fileInput.files && fileInput.files[0];
     if (!file) return;
@@ -836,41 +842,15 @@ function basicPdfTextExtraction(base64Data) {
       var authStored = await chrome.storage.local.get([STORAGE.auth]);
       if (!authStored[STORAGE.auth] || !authStored[STORAGE.auth].token) return;
 
-      var resp = await sendRuntime({ type: "FETCH_RESUMES" });
-      if (!resp.ok || !resp.data || !resp.data.length) return;
+      var resp = await sendRuntime({ type: "SYNC_CLOUD_RESUMES" });
+      if (!resp || !resp.ok) return;
 
-      var stored = await chrome.storage.local.get([STORAGE.resumes]);
-      var local = stored[STORAGE.resumes] || [];
-      var merged = local.slice();
-
-      resp.data.forEach(function (cloud) {
-        var exists = merged.some(function (r) {
-          return r.cloudId === cloud.id || r.id === "cloud_" + cloud.id;
-        });
-        if (exists || !cloud.rawText) return;
-        merged.push({
-          id: "cloud_" + cloud.id,
-          cloudId: cloud.id,
-          filename: cloud.filename || "resume.txt",
-          mimeType: cloud.mimeType || "text/plain",
-          size: cloud.fileSize || cloud.rawText.length,
-          base64: "",
-          textPreview: cloud.textPreview || cloud.rawText.slice(0, 20000),
-          extractedText: cloud.rawText,
-          uploadedAt: cloud.createdAt || Date.now(),
-          label: cloud.label || cloud.filename || "Cloud resume",
-          isDefault: cloud.isDefault && merged.every(function (r) { return !r.isDefault; }),
-          syncStatus: "synced"
-        });
-      });
-
-      if (merged.length > 0 && !merged.some(function (r) { return r.isDefault; })) {
-        merged[0].isDefault = true;
-      }
-
-      await chrome.storage.local.set({ rf_resumes: merged });
       refreshResumes();
       renderResumesList();
+
+      if (resp.added > 0) {
+        showToast(resp.added + " resume(s) synced from your Fluxpage account");
+      }
     } catch (e) {
       /* ignore merge errors */
     }
@@ -899,7 +879,10 @@ function basicPdfTextExtraction(base64Data) {
     resumes.forEach(function (r) {
       var opt = document.createElement("option");
       opt.value = r.id;
-      opt.textContent = (r.isDefault ? "★ " : "") + r.label + " (" + formatSize(r.size) + ")";
+      var prefix = r.isDefault ? "★ " : "";
+      var isCloud = !!r.cloudId || String(r.id || "").indexOf("cloud_") === 0;
+      var cloudTag = isCloud ? "☁ " : "";
+      opt.textContent = prefix + cloudTag + r.label + " (" + formatSize(r.size) + ")";
       select.appendChild(opt);
     });
 
@@ -992,6 +975,17 @@ function basicPdfTextExtraction(base64Data) {
 
   async function onAnalyze() {
     hideError();
+    var stored = await chrome.storage.local.get([STORAGE.auth]);
+    var auth = stored[STORAGE.auth];
+    if (!auth || !auth.token) {
+      showError("Please log in to analyze jobs. Click Login below.");
+      return;
+    }
+    var planErr = checkPlanLimit("analyze");
+    if (planErr) {
+      showError(planErr);
+      return;
+    }
     var btn = $("#analyzeBtn");
     var original = btn.innerHTML;
     btn.disabled = true;
@@ -1088,6 +1082,25 @@ function basicPdfTextExtraction(base64Data) {
   function renderResults(analysis, ctx) {
     $("#results").hidden = false;
 
+    // Show mock warning banner when using offline/fallback scoring
+    var mockWarning = $("#mockWarning");
+    if (mockWarning) {
+      mockWarning.style.display = analysis.mock ? "flex" : "none";
+    }
+
+    var knockoutWarning = $("#knockoutWarning");
+    if (knockoutWarning) {
+      var failedKo = analysis.passedKnockouts === false && !analysis.mock;
+      knockoutWarning.style.display = failedKo ? "flex" : "none";
+      if (failedKo && analysis.knockoutDetails && analysis.knockoutDetails.failedFilters) {
+        var hardFails = analysis.knockoutDetails.failedFilters.filter(function (f) { return f.severity === "hard"; });
+        var koList = hardFails.length ? hardFails : analysis.knockoutDetails.failedFilters;
+        var koText = koList.slice(0, 2).map(function (f) { return f.message; }).join(" · ");
+        var koEl = $("#knockoutWarningText");
+        if (koEl) koEl.textContent = koText || "Knockout filter failed";
+      }
+    }
+
     var score = Math.max(0, Math.min(100, Math.round(Number(analysis.score) || 0)));
     $("#scoreNum").textContent = score;
     var ringColor = score >= 75 ? "#16a34a" : score >= 50 ? "#d97706" : "#dc2626";
@@ -1103,6 +1116,26 @@ function basicPdfTextExtraction(base64Data) {
 
     renderPills("#missingRow", analysis.missingKeywords, "miss");
     $("#missingCount").textContent = "(" + (analysis.missingKeywords || []).length + ")";
+
+    var metaEl = $("#enterpriseMeta");
+    if (metaEl) {
+      metaEl.textContent = "";
+      if (analysis.parsedResume || analysis.breakdown) {
+        metaEl.hidden = false;
+        var parts = [];
+        if (analysis.parsedResume) {
+          parts.push("Exp: " + (analysis.parsedResume.totalExperienceYears || 0) + "y");
+          parts.push("Level: " + (analysis.parsedResume.seniorityLevel || "unknown"));
+        }
+        if (analysis.breakdown) {
+          parts.push("KW " + (analysis.breakdown.keywordMatch || 0) + "%");
+          parts.push("Sem " + (analysis.breakdown.semanticSimilarity || 0) + "%");
+        }
+        metaEl.textContent = parts.join(" · ");
+      } else {
+        metaEl.hidden = true;
+      }
+    }
 
     var sl = $("#suggestionsList");
     sl.textContent = "";
@@ -1141,6 +1174,17 @@ function basicPdfTextExtraction(base64Data) {
 
   async function onOptimizeResume() {
     hideError();
+    var stored = await chrome.storage.local.get([STORAGE.auth]);
+    var auth = stored[STORAGE.auth];
+    if (!auth || !auth.token) {
+      showError("Please log in to optimize resumes. Click Login below.");
+      return;
+    }
+    var planErr = checkPlanLimit("tailor");
+    if (planErr) {
+      showError(planErr);
+      return;
+    }
     var btn = $("#optimizeResumeBtn");
     btn.disabled = true;
     btn.querySelector(".btn-label").textContent = "Sending to editor...";
@@ -1151,7 +1195,7 @@ function basicPdfTextExtraction(base64Data) {
       var analysis = stored[STORAGE.lastAnalysis];
       var resume = resumes.find(function (r) { return r.isDefault; }) || resumes[0];
 
-      if (!resume || !resume.base64) {
+      if (!resume || (!resume.base64 && !resume.extractedText && !resume.textPreview)) {
         throw new Error("Upload a resume first.");
       }
       if (!analysis) {
@@ -1401,23 +1445,105 @@ function basicPdfTextExtraction(base64Data) {
 
   // -- Auth ------------------------------------------------------------
 
+  var userPlan = { tier: "free", usage: null };
+
   async function refreshAuthStatus() {
     var stored = await chrome.storage.local.get([STORAGE.auth]);
     var auth = stored[STORAGE.auth];
     var statusEl = $("#authStatus");
+    var connectedEl = $("#authConnected");
+    var nameEl = $("#authName");
+    var emailEl = $("#authEmail");
     var loginBtn = $("#loginBtn");
     var logoutBtn = $("#logoutBtn");
 
     if (auth && auth.token && auth.user) {
-      statusEl.textContent = "Logged in as " + (auth.user.email || "");
+      statusEl.hidden = true;
+      statusEl.textContent = "";
+      if (connectedEl) connectedEl.hidden = false;
+      if (nameEl) nameEl.textContent = auth.user.name || "Connected account";
+      if (emailEl) emailEl.textContent = auth.user.email || "";
       loginBtn.hidden = true;
       logoutBtn.hidden = false;
       mergeCloudResumes();
+      refreshPlanStatus();
     } else {
-      statusEl.textContent = "Not logged in";
+      statusEl.hidden = false;
+      statusEl.textContent = "Not logged in — sign in to sync your resumes";
+      if (connectedEl) connectedEl.hidden = true;
       loginBtn.hidden = false;
       logoutBtn.hidden = true;
+      userPlan = { tier: "free", usage: null };
+      updatePlanBadge();
     }
+  }
+
+  async function refreshPlanStatus() {
+    try {
+      var resp = await sendRuntime({ type: "FETCH_USER_PROFILE" });
+      if (resp && resp.ok && resp.data) {
+        userPlan = {
+          tier: resp.data.tier || "free",
+          usage: resp.data.usage || null
+        };
+      }
+    } catch (e) {
+      userPlan = { tier: "free", usage: null };
+    }
+    updatePlanBadge();
+  }
+
+  function updatePlanBadge() {
+    var badgeEl = $("#planBadge");
+    if (!badgeEl) return;
+    var tier = (userPlan.tier || "free").charAt(0).toUpperCase() + (userPlan.tier || "free").slice(1);
+    badgeEl.textContent = tier + " Plan";
+    badgeEl.className = "plan-badge plan-" + (userPlan.tier || "free");
+
+    var usageEl = $("#planUsage");
+    if (!usageEl) return;
+    if (userPlan.usage) {
+      var limit = userPlan.usage.tailorsLimit;
+      var used = userPlan.usage.tailorsThisMonth || 0;
+      if (limit < 0) {
+        usageEl.textContent = used + " tailors used (unlimited)";
+      } else {
+        usageEl.textContent = used + "/" + limit + " tailors this month";
+      }
+      usageEl.hidden = false;
+    } else {
+      usageEl.hidden = true;
+    }
+  }
+
+  function checkPlanLimit(action) {
+    if (!userPlan.usage) return null;
+    var tier = userPlan.tier || "free";
+    var usage = userPlan.usage;
+
+    if (action === "analyze" || action === "tailor") {
+      var limit = usage.tailorsLimit;
+      var used = usage.tailorsThisMonth || 0;
+      if (limit >= 0 && used >= limit) {
+        return "Monthly tailor limit reached (" + limit + " on " + tier + " plan). Upgrade to Pro or Premium for more.";
+      }
+    }
+
+    if (action === "upload_resume") {
+      var rLimit = usage.resumesLimit;
+      var rCount = usage.resumesCount || 0;
+      if (rLimit >= 0 && rCount >= rLimit) {
+        return "Resume limit reached (" + rLimit + " on " + tier + " plan). Delete a resume or upgrade your plan.";
+      }
+    }
+
+    if (action === "cover_letter") {
+      if (!usage.coverLettersEnabled) {
+        return "Cover letters require a Pro or Premium plan.";
+      }
+    }
+
+    return null;
   }
 
   // -- Settings --------------------------------------------------------
@@ -1498,6 +1624,7 @@ function basicPdfTextExtraction(base64Data) {
           '<div class="header-titles">' +
              '<div class="app-title">Fluxpage</div>' +
             '<div class="app-sub">AI Job Assistant</div>' +
+            '<a class="ceo-credit" href="https://ceo.agency/" target="_blank" rel="noopener noreferrer" title="CEO.AGENCY — AI agency for growing businesses">A product by CEO.AGENCY</a>' +
           '</div>' +
           '<span class="src-badge" id="sourceBadge">\u2014</span>' +
         '</div>' +
@@ -1582,6 +1709,14 @@ function basicPdfTextExtraction(base64Data) {
         '</div>' +
 
         '<div class="card results" id="results" hidden>' +
+          '<div class="mock-warning" id="mockWarning" style="display:none;">' +
+            '<span class="mock-warning-icon">⚠️</span> ' +
+            '<span>Offline mode — score is approximate (API unavailable)</span>' +
+          '</div>' +
+          '<div class="knockout-warning" id="knockoutWarning" style="display:none;">' +
+            '<span class="mock-warning-icon">⛔</span> ' +
+            '<span id="knockoutWarningText">Knockout filter failed</span>' +
+          '</div>' +
           '<div class="score-wrap">' +
             '<div class="score-ring" id="scoreRing">' +
               '<div class="score-inner">' +
@@ -1598,6 +1733,7 @@ function basicPdfTextExtraction(base64Data) {
           '<div class="pill-row" id="matchedRow"></div>' +
           '<div class="section-title tight">Missing keywords <span class="count" id="missingCount"></span></div>' +
           '<div class="pill-row" id="missingRow"></div>' +
+          '<div class="enterprise-meta" id="enterpriseMeta" hidden></div>' +
           '<div class="section-title tight">Suggestions</div>' +
           '<ul class="sug-list" id="suggestionsList"></ul>' +
           '<button class="start-btn optimize-btn" id="optimizeResumeBtn" style="display:none;margin-top:12px;">' +
@@ -1642,8 +1778,25 @@ function basicPdfTextExtraction(base64Data) {
 
       '<div class="error-banner" id="errorBanner" hidden></div>' +
 
+      '<div class="ceo-footer">' +
+        '<a href="https://ceo.agency/" target="_blank" rel="noopener noreferrer" title="CEO.AGENCY — AI agency for growing businesses">' +
+          'A product by <strong>CEO.AGENCY</strong>' +
+        '</a>' +
+      '</div>' +
+
       '<div class="auth-bar" id="authBar">' +
-        '<span id="authStatus">Not logged in</span>' +
+        '<div class="auth-info">' +
+          '<div class="auth-connected" id="authConnected" hidden>' +
+            '<span class="auth-dot" title="Account connected"></span>' +
+            '<div class="auth-details">' +
+              '<span class="auth-name" id="authName"></span>' +
+              '<span class="auth-email" id="authEmail"></span>' +
+            '</div>' +
+          '</div>' +
+          '<span id="authStatus">Not logged in — sign in to sync your resumes</span>' +
+          '<span class="plan-badge plan-free" id="planBadge">Free Plan</span>' +
+          '<span class="plan-usage" id="planUsage" hidden></span>' +
+        '</div>' +
         '<div class="auth-btns">' +
           '<button class="btn btn-text btn-sm" id="loginBtn">Login</button>' +
           '<button class="btn btn-text btn-sm" id="logoutBtn" hidden>Logout</button>' +
@@ -1696,6 +1849,12 @@ function basicPdfTextExtraction(base64Data) {
         'box-shadow: 0 4px 12px rgba(3, 105, 161, 0.22);' +
       '}' +
       '.header-titles { line-height: 1.1; }' +
+      '.ceo-credit {' +
+        'display: block; margin-top: 3px; font-size: 9px; color: #64748b;' +
+        'text-decoration: none; font-weight: 500; letter-spacing: 0.01em;' +
+      '}' +
+      '.ceo-credit:hover { color: #0369a1; text-decoration: underline; }' +
+      '.ceo-credit strong { font-weight: 700; color: #334155; }' +
       '.app-title { font-size: 14px; font-weight: 600; color: #0b1220; }' +
       '.app-sub { font-size: 10px; color: #64748b; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }' +
       '.src-badge {' +
@@ -1836,6 +1995,11 @@ function basicPdfTextExtraction(base64Data) {
       '.resume-item-info { min-width: 0; flex: 1; }' +
       '.resume-item-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }' +
 
+      '.mock-warning { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 10px; border-radius: 6px; background: #fef3c7; border: 1px solid #f59e0b; font-size: 12px; color: #92400e; }' +
+      '.knockout-warning { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 10px; border-radius: 6px; background: #fef2f2; border: 1px solid #f87171; font-size: 11px; color: #991b1b; }' +
+      '.enterprise-meta { font-size: 10px; color: #64748b; margin: 8px 0 4px; padding: 6px 8px; background: rgba(15,23,42,0.03); border-radius: 6px; }' +
+      '.mock-warning-icon { font-size: 14px; flex-shrink: 0; }' +
+
       '.score-wrap { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }' +
       '.score-ring {' +
         'width: 96px; height: 96px; border-radius: 50%;' +
@@ -1945,13 +2109,40 @@ function basicPdfTextExtraction(base64Data) {
       '.chk { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #334155; margin-top: 12px; }' +
       '.save-btn { margin-top: 12px; width: 100%; }' +
 
+      '.ceo-footer {' +
+        'padding: 6px 16px; text-align: center; background: rgba(244,247,252,0.75);' +
+        'border-top: 1px solid rgba(15,23,42,0.06); flex-shrink: 0;' +
+      '}' +
+      '.ceo-footer a {' +
+        'font-size: 10px; color: #64748b; text-decoration: none;' +
+      '}' +
+      '.ceo-footer a:hover { color: #0369a1; text-decoration: underline; }' +
+      '.ceo-footer strong { font-weight: 700; color: #334155; }' +
+
       '.auth-bar {' +
         'display: flex; justify-content: space-between; align-items: center;' +
         'padding: 8px 16px; background: rgba(244,247,252,0.9);' +
         'border-top: 1px solid rgba(15,23,42,0.06); flex-shrink: 0;' +
         'font-size: 11px; color: #64748b;' +
       '}' +
+      '.auth-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }' +
+      '.auth-connected { display: flex; align-items: center; gap: 8px; min-width: 0; }' +
+      '.auth-dot {' +
+        'width: 8px; height: 8px; border-radius: 50%; background: #16a34a; flex-shrink: 0;' +
+        'box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);' +
+      '}' +
+      '.auth-details { display: flex; flex-direction: column; gap: 1px; min-width: 0; }' +
+      '.auth-name { font-size: 11px; font-weight: 600; color: #0b1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' +
+      '.auth-email { font-size: 10px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' +
       '.auth-btns { display: flex; gap: 4px; }' +
+      '.plan-badge {' +
+        'display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase;' +
+        'letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; margin-top: 2px;' +
+      '}' +
+      '.plan-free { background: #f1f5f9; color: #475569; }' +
+      '.plan-pro { background: #dbeafe; color: #1d4ed8; }' +
+      '.plan-premium { background: #fef3c7; color: #92400e; }' +
+      '.plan-usage { font-size: 10px; color: #64748b; }' +
 
       '.toast {' +
         'position: absolute; bottom: 14px; left: 50%;' +
