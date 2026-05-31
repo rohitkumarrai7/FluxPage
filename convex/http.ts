@@ -445,10 +445,13 @@ http.route({
       const atsResult = scoreResumeAgainstJD(resumeText, body.jobDescription);
 
       const localAnalysis = body.localAnalysis || {};
-      const localScore = localAnalysis.score || atsResult.overallScore;
-      const localMatched = localAnalysis.matchedKeywords || atsResult.matchedKeywords.map((k: any) => k.keyword);
-      const localMissing = localAnalysis.missingKeywords || atsResult.missingKeywords.map((k: any) => k.keyword);
-      const localSuggestions = localAnalysis.suggestions || [];
+      const localScore = body.localScore || localAnalysis.score || atsResult.overallScore;
+
+      const pickNonEmpty = (...arrays: any[]) => arrays.find((a) => Array.isArray(a) && a.length > 0) || [];
+      const localMatched = pickNonEmpty(body.localMatched, localAnalysis.matchedKeywords, atsResult.matchedKeywords.map((k: any) => k.keyword));
+      const localMissing = pickNonEmpty(body.localMissing, localAnalysis.missingKeywords, atsResult.missingKeywords.map((k: any) => k.keyword));
+      const atsSuggestionStrings = (atsResult.suggestions || []).map((s: any) => typeof s === "string" ? s : s.message).filter(Boolean);
+      const localSuggestions = pickNonEmpty(body.localSuggestions, localAnalysis.suggestions, atsSuggestionStrings);
 
       const result = await ctx.runMutation(api.drafts.create, {
         userId: userId as any,
@@ -523,6 +526,29 @@ http.route({
       const result = await ctx.runMutation(api.drafts.convert, {
         draftId,
         label: body.label,
+      });
+      return jsonResponse(request, result);
+    } catch (e: any) {
+      return jsonResponse(request, { detail: e.message }, 400);
+    }
+  }),
+});
+
+http.route({
+  path: "/v1/drafts/update",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      if (!body.draftId) {
+        return jsonResponse(request, { detail: "draftId is required" }, 400);
+      }
+      const result = await ctx.runMutation(api.drafts.updateStructured, {
+        draftId: body.draftId as any,
+        structuredResume: body.structuredResume,
+        aiSuggestions: body.aiSuggestions,
+        currentScore: body.currentScore ?? 0,
+        templateSlug: body.templateSlug,
       });
       return jsonResponse(request, result);
     } catch (e: any) {
@@ -786,6 +812,7 @@ for (const path of [
   "/v1/resumes", "/v1/resumes/upload",
   "/v1/jobs",
   "/v1/drafts/create",
+  "/v1/drafts/update",
   "/v1/ats/analyze",
   "/v1/pdf/parse",
   "/v1/ai/generate",

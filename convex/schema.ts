@@ -148,6 +148,7 @@ export default defineSchema({
   templates: defineTable({
     name: v.string(),
     slug: v.string(),
+    layoutKey: v.optional(v.string()),
     category: v.string(),
     engine: v.string(),
     thumbnail: v.optional(v.string()),

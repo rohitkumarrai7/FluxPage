@@ -474,7 +474,7 @@ export function parseJobDescription(jdText: string): StructuredJD {
   }
 
   return {
-    title, company, requiredSkills: [...new Set(requiredSkills)],
+    title, company, requiredSkills: enrichJDKeywords(jdText, [...new Set(requiredSkills)], [...new Set(preferredSkills)], responsibilities),
     preferredSkills: [...new Set(preferredSkills)],
     minYearsExperience: minYears, maxYearsExperience: maxYears,
     requiredEducation, location, employmentType, isRemote,
@@ -485,10 +485,59 @@ export function parseJobDescription(jdText: string): StructuredJD {
 function extractSkillsFromLine(line: string): string[] {
   const techPattern = /\b(python|java|javascript|typescript|react|angular|vue|node\.?js|next\.?js|express|django|flask|spring\s*boot|spring|ruby|rails|go|golang|rust|swift|kotlin|c\+\+|c#|\.net|php|laravel|scala|sql|mysql|postgresql|postgres|mongodb|redis|elasticsearch|kafka|docker|kubernetes|k8s|aws|azure|gcp|terraform|ansible|jenkins|git|github|gitlab|jira|confluence|figma|tableau|power\s*bi|pandas|numpy|tensorflow|pytorch|scikit-learn|keras|spark|hadoop|airflow|snowflake|databricks|graphql|rest|microservices|ci\/cd|devops|linux|bash|html|css|sass|tailwind|bootstrap|webpack|vite|jest|cypress|selenium|agile|scrum|kanban|machine\s*learning|deep\s*learning|nlp|computer\s*vision|data\s*science|data\s*engineering)\b/gi;
 
-  const matches = line.match(techPattern) || [];
-  return matches
-    .map((m) => m.toLowerCase().trim())
-    .filter((s) => !JD_NOISE_WORDS.has(s));
+  const businessPattern = /\b(business\s*development|inside\s*sales|outside\s*sales|sales|marketing|lead\s*generation|prospecting|cold\s*calling|pipeline\s*development|crm|salesforce|hubspot|zoho|account\s*management|client\s*acquisition|client\s*relations|customer\s*success|market\s*research|market\s*analysis|competitive\s*analysis|revenue\s*growth|quota|closing|negotiation|stakeholder\s*management|partnership|strategic\s*partnership|asset\s*sourcing|due\s*diligence|financial\s*modeling|financial\s*analysis|pitch\s*deck|proposal|rfp|international|cross[- ]border|export|import|market\s*entry|go[- ]to[- ]market|product\s*launch|launch\s*planning|new\s*product\s*development|proactive\s*outreach|relationship\s*building|presenting|communication|excel|powerpoint|linkedin|social\s*media|content\s*marketing|seo|sem|brand\s*management|digital\s*marketing|email\s*marketing|campaign\s*management|analytics|reporting|operations|project\s*management|consulting|strategy|strategic\s*planning|research|analysis|outreach|networking|onboarding|training|mentoring|leadership|teamwork|collaboration)\b/gi;
+
+  const techMatches = (line.match(techPattern) || []).map((m) => m.toLowerCase().trim());
+  const bizMatches = (line.match(businessPattern) || []).map((m) => m.toLowerCase().trim().replace(/\s+/g, " "));
+  return [...techMatches, ...bizMatches].filter((s) => !JD_NOISE_WORDS.has(s));
+}
+
+const JD_PHRASE_PATTERN = /\b(new product development|asset sourcing|proactive outreach|business development|launch planning|market research|market analysis|lead generation|cold calling|account management|client acquisition|stakeholder management|strategic partnership|go-to-market|go to market|product launch|pipeline development|relationship building|competitive analysis|financial modeling|due diligence|cross-border|cross border|inside sales|outside sales|social media marketing|content marketing|digital marketing|email marketing|project management|customer success|revenue growth)\b/gi;
+
+function extractKeyPhrases(line: string): string[] {
+  const phrases: string[] = [];
+  const clean = line.replace(/^[-•*▪▸►◆]\s*/, "").trim();
+  let match;
+  const re = new RegExp(JD_PHRASE_PATTERN.source, "gi");
+  while ((match = re.exec(clean)) !== null) {
+    phrases.push(match[0].toLowerCase().replace(/\s+/g, " "));
+  }
+  if (clean.length >= 12 && clean.length <= 70 && !/^https?:\/\//i.test(clean)) {
+    const short = clean.slice(0, 55).trim();
+    if (short.split(/\s+/).length >= 2) phrases.push(short.toLowerCase());
+  }
+  return phrases;
+}
+
+function enrichJDKeywords(
+  jdText: string,
+  required: string[],
+  preferred: string[],
+  responsibilities: string[]
+): string[] {
+  const terms = new Set([...required, ...preferred]);
+
+  // Scan full JD for domain terms
+  const fullLine = jdText.replace(/\n/g, " ");
+  const bizRe = /\b(business\s*development|inside\s*sales|sales|marketing|lead\s*generation|prospecting|pipeline|crm|salesforce|hubspot|account\s*management|market\s*research|asset\s*sourcing|proactive\s*outreach|new\s*product\s*development|launch\s*planning|stakeholder|partnership|negotiation|international|excel|powerpoint|social\s*media|content\s*marketing|digital\s*marketing|go[- ]to[- ]market|product\s*launch|due\s*diligence|financial\s*modeling|client\s*acquisition|relationship\s*building|competitive\s*analysis|revenue|outreach|networking|strategy|consulting|operations|analytics|reporting)\b/gi;
+  let m;
+  while ((m = bizRe.exec(fullLine)) !== null) {
+    terms.add(m[0].toLowerCase().replace(/\s+/g, " "));
+  }
+
+  for (const resp of responsibilities) {
+    for (const p of extractKeyPhrases(resp)) terms.add(p);
+    for (const s of extractSkillsFromLine(resp)) terms.add(s);
+  }
+
+  // Title-derived terms
+  const titleMatch = jdText.split("\n")[0]?.trim();
+  if (titleMatch && titleMatch.length > 3 && titleMatch.length < 80) {
+    for (const p of extractKeyPhrases(titleMatch)) terms.add(p);
+    for (const s of extractSkillsFromLine(titleMatch)) terms.add(s);
+  }
+
+  return [...terms].filter((t) => t.length > 2 && !JD_NOISE_WORDS.has(t)).slice(0, 35);
 }
 
 // ─── Main Resume Parser ────────────────────────────────────────────────────────

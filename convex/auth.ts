@@ -386,3 +386,15 @@ export const getOrCreateAnonUser = mutation({
     });
   },
 });
+
+export const lookupByEmail = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+    if (!user) return null;
+    return { id: user._id, email: user.email, tier: user.tier, tailorsThisMonth: user.tailorsThisMonth, tailorsResetAt: user.tailorsResetAt };
+  },
+});

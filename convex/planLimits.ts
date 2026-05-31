@@ -7,7 +7,7 @@ export const PLAN_LIMITS: Record<
   PlanTier,
   { tailorsPerMonth: number; maxResumes: number; coverLetters: boolean }
 > = {
-  free: { tailorsPerMonth: 5, maxResumes: 3, coverLetters: false },
+  free: { tailorsPerMonth: 50, maxResumes: 10, coverLetters: false },
   pro: { tailorsPerMonth: 100, maxResumes: 20, coverLetters: true },
   premium: { tailorsPerMonth: -1, maxResumes: -1, coverLetters: true },
 };
@@ -67,6 +67,12 @@ export async function incrementTailorUsage(ctx: MutationCtx, userId: Id<"users">
     tailorsResetAt: monthExpired ? now : resetAt,
     analysesCount: (user.analysesCount || 0) + 1,
   });
+}
+
+export async function resetTailorUsage(ctx: MutationCtx, userId: Id<"users">) {
+  const user = await ctx.db.get(userId);
+  if (!user) return;
+  await ctx.db.patch(userId, { tailorsThisMonth: 0, tailorsResetAt: Date.now() });
 }
 
 export async function assertCanUploadResume(ctx: Ctx, userId: Id<"users">) {

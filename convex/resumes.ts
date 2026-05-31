@@ -25,8 +25,9 @@ export const upload = mutation({
     const isFirst = resumes.length === 0;
 
     const textForParse = args.rawText || args.textPreview || "";
-    const structuredData = textForParse
-      ? parseResumeNER(textForParse)
+    const nerData = textForParse ? parseResumeNER(textForParse) : null;
+    const structuredData = nerData
+      ? { ...nerData, clientStructured: args.structuredData || null }
       : args.structuredData;
 
     const resumeId = await ctx.db.insert("resumes", {

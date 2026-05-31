@@ -2,26 +2,17 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { scoreResumeAgainstJD } from "./atsScoring";
 import { parseResumeText, buildSuggestions } from "./resumeParser";
-import { assertCanCreateTailor, incrementTailorUsage } from "./planLimits";
+import { assertCanCreateTailor, incrementTailorUsage, resetTailorUsage } from "./planLimits";
 
 const NON_SKILL_KW = new Set([
-  "development", "ai-generated", "modern", "optimization", "improve",
-  "technologies", "advanced", "related", "architecture", "design",
-  "looking", "join", "company", "opportunity", "position", "apply",
+  "ai-generated", "looking", "join", "opportunity", "position", "apply",
   "prefer", "required", "preferred", "qualifications", "bonus",
-  "excellent", "communication", "understanding", "knowledge",
-  "familiarity", "proficiency", "proficient", "expertise", "hands-on",
-  "environment", "agile", "practices", "methodologies", "approach",
-  "solutions", "deliver", "delivering", "building", "creating",
-  "maintaining", "ensure", "across", "multiple", "both", "either",
-  "based", "focus", "focused", "maintainability", "end",
-  "scalable", "production", "integration", "implementation",
-  "management", "quality", "best", "standards", "process",
-  "processes", "platform", "platforms", "frameworks", "libraries",
-  "develop", "developing", "provide", "providing", "support",
-  "supporting", "collaborate", "collaborating", "contribute",
-  "drive", "driving", "lead", "leading", "ensuring",
-  "high", "low", "great", "key", "core",
+  "familiarity", "hands-on", "deliver", "delivering",
+  "ensure", "across", "multiple", "both", "either",
+  "based", "focus", "focused", "end",
+  "provide", "providing", "collaborate", "contribute",
+  "drive", "driving", "ensuring",
+  "high", "low", "great",
   "deep", "wide", "full", "true", "real", "able", "available",
   "minimum", "maximum", "ideal", "clear", "simple", "complex",
 ]);
@@ -262,17 +253,29 @@ export const create = mutation({
       }
     }
 
+    const resumeTextForScore = resumeText || "";
+    const atsResult = scoreResumeAgainstJD(resumeTextForScore, args.jobDescription);
+    const baselineScore = atsResult.overallScore;
+
     const matchedKw = args.localMatched || [];
-    const missingKw = args.localMissing || [];
+    let missingKw = args.localMissing || [];
+    if (missingKw.length === 0) {
+      missingKw = (atsResult.missingKeywords || []).map((k: any) =>
+        typeof k === "string" ? k : k.keyword
+      ).filter(Boolean);
+    }
+
+    let rawSuggestions = args.localSuggestions || [];
+    if (rawSuggestions.length === 0) {
+      rawSuggestions = (atsResult.suggestions || []).map((s: any) =>
+        typeof s === "string" ? s : s.message
+      ).filter(Boolean);
+    }
 
     const structuredResume = resumeText ? parseResumeText(resumeText) : null;
     const aiSuggestions = structuredResume
-      ? buildSuggestions(structuredResume, missingKw, args.localSuggestions || [])
+      ? buildSuggestions(structuredResume, missingKw, [])
       : [];
-
-    const resumeTextForScore = resumeText || "";
-    const atsResult = scoreResumeAgainstJD(resumeTextForScore, args.jobDescription);
-    const optimizedScore = atsResult.overallScore;
 
     const gapAnalysis = {
       missingKeywords: missingKw.slice(0, 10),
@@ -302,8 +305,8 @@ export const create = mutation({
       },
       originalLatex: "",
       currentLatex: "",
-      initialScore: initialScore || atsResult.overallScore,
-      currentScore: optimizedScore,
+      initialScore: initialScore || baselineScore,
+      currentScore: baselineScore,
       status: "ready",
       expiresAt: Date.now() + 24 * 60 * 60 * 1000,
     });
@@ -394,7 +397,15 @@ export const compileLatex = mutation({
     let atsResult: any = { overallScore: 0, matchedKeywords: [], missingKeywords: [] };
 
     if (jd) {
-      atsResult = scoreResumeAgainstJD(args.latexSource, jd);
+      const plainText = args.latexSource
+        .replace(/\\documentclass[\s\S]*?\\begin\{document\}/g, "")
+        .replace(/\\end\{document\}/g, "")
+        .replace(/\\[a-zA-Z]+\{([^}]*)\}/g, "$1")
+        .replace(/\\[a-zA-Z]+/g, " ")
+        .replace(/[{}\\$]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      atsResult = scoreResumeAgainstJD(plainText || args.latexSource, jd);
     }
 
     await ctx.db.patch(args.draftId, {
@@ -423,6 +434,7 @@ export const updateStructured = mutation({
     structuredResume: v.any(),
     aiSuggestions: v.any(),
     currentScore: v.number(),
+    templateSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const draft = await ctx.db.get(args.draftId);
@@ -434,6 +446,7 @@ export const updateStructured = mutation({
         ...ctxData,
         structuredResume: args.structuredResume,
         aiSuggestions: args.aiSuggestions,
+        ...(args.templateSlug ? { preferredTemplate: args.templateSlug } : {}),
       },
     });
     return { ok: true };
@@ -463,6 +476,14 @@ export const convert = mutation({
     await ctx.db.patch(args.draftId, { status: "converted" });
 
     return { versionId };
+  },
+});
+
+export const resetUsage = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await resetTailorUsage(ctx, args.userId);
+    return { ok: true };
   },
 });
 
