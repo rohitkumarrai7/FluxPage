@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthLayout, SpinnerCenter } from "@/components/ui";
 import { ClerkSignUpForm } from "@/components/auth/ClerkAuthForms";
+import { PasswordAuthForm } from "@/components/auth/PasswordAuthForm";
+import { clerkClientConfigured } from "@/lib/clerkConfig";
 
 function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
   return searchParams.get("redirect") || searchParams.get("redirect_url") || "";
@@ -25,7 +27,16 @@ function RegisterContent() {
         <h1 className="text-2xl font-bold text-foreground">Create your account</h1>
         <p className="text-muted text-sm mt-1">Free plan — no credit card required</p>
       </div>
-      <ClerkSignUpForm signInUrl={loginUrl} forceRedirectUrl={afterSignUp} />
+      {clerkClientConfigured ? (
+        <ClerkSignUpForm signInUrl={loginUrl} forceRedirectUrl={afterSignUp} />
+      ) : (
+        <>
+          <p className="text-sm text-muted text-center mb-4">
+            Secure sign-up is temporarily unavailable. Create an account with email below.
+          </p>
+          <PasswordAuthForm redirect={redirect} mode="register" />
+        </>
+      )}
     </AuthLayout>
   );
 }

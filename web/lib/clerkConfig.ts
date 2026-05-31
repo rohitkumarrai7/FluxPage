@@ -1,8 +1,12 @@
+export const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+/** Server-side: both publishable + secret keys present. */
 export const clerkConfigured = Boolean(
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
+  clerkPublishableKey && process.env.CLERK_SECRET_KEY
 );
 
-export const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+/** Client-safe: publishable key baked into the bundle. */
+export const clerkClientConfigured = Boolean(clerkPublishableKey);
 
 /** Dev-only hint for missing Clerk env (never log secret values). */
 export function getClerkSetupHint(): string | null {
