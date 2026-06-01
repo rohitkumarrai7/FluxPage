@@ -63,10 +63,14 @@
     if (!shadowHost) {
       buildSidebar();
       isVisible = true;
+      trackExtension("extension_sidebar_opened", { source: "floating_button" });
       return;
     }
     isVisible = !isVisible;
     sidebarEl.style.transform = isVisible ? "translateX(0)" : "translateX(100%)";
+    if (isVisible) {
+      trackExtension("extension_sidebar_opened", { source: "toggle" });
+    }
     if (isMinimized && isVisible) {
       isMinimized = false;
       sidebarEl.classList.remove("minimized");
@@ -325,6 +329,10 @@
         statusEl.textContent = "Saved!";
         statusEl.className = "save-status synced";
         flash("Job saved to Fluxpage.");
+        trackExtension("extension_job_saved", {
+          source: jobData.source || "",
+          synced: true,
+        });
         loadSavedJobs();
       } else {
         statusEl.textContent = "Saved locally (sync pending)";
@@ -424,6 +432,7 @@
     hideError();
     var planErr = checkPlanLimit("upload_resume");
     if (planErr) {
+      trackExtension("extension_plan_limit_hit", { limit_type: "upload_resume" });
       showError(planErr);
       e.target.value = "";
       return;
@@ -484,6 +493,10 @@
       refreshResumes();
       renderResumesList();
       flash("Resume uploaded successfully.");
+      trackExtension("extension_resume_uploaded", {
+        mime_type: newResume.mimeType || "",
+        file_size: file.size,
+      });
 
       var rawText = fullExtractedText || textPreview;
       if (rawText && rawText.length >= 50) {
@@ -983,9 +996,11 @@ function basicPdfTextExtraction(base64Data) {
     }
     var planErr = checkPlanLimit("analyze");
     if (planErr) {
+      trackExtension("extension_plan_limit_hit", { limit_type: "analyze" });
       showError(planErr);
       return;
     }
+    trackExtension("extension_analyze_started", { source: location.hostname });
     var btn = $("#analyzeBtn");
     var original = btn.innerHTML;
     btn.disabled = true;
@@ -1030,6 +1045,10 @@ function basicPdfTextExtraction(base64Data) {
         jobTitle: jobData.jobTitle,
         company: jobData.company,
         source: jobData.source
+      });
+      trackExtension("extension_analyze_completed", {
+        score: resp.data && resp.data.score,
+        source: jobData.source || "",
       });
     } catch (err) {
       showError(err.message || String(err));
@@ -1077,6 +1096,13 @@ function basicPdfTextExtraction(base64Data) {
         }
       });
     });
+  }
+
+  function trackExtension(event, properties) {
+    sendRuntime({
+      type: "TRACK_ANALYTICS",
+      payload: { event: event, properties: properties || {} },
+    }).catch(function () {});
   }
 
   function renderResults(analysis, ctx) {
@@ -1182,9 +1208,11 @@ function basicPdfTextExtraction(base64Data) {
     }
     var planErr = checkPlanLimit("tailor");
     if (planErr) {
+      trackExtension("extension_plan_limit_hit", { limit_type: "tailor" });
       showError(planErr);
       return;
     }
+    trackExtension("extension_tailor_started", { source: location.hostname });
     var btn = $("#optimizeResumeBtn");
     btn.disabled = true;
     btn.querySelector(".btn-label").textContent = "Sending to editor...";
@@ -1289,6 +1317,10 @@ function basicPdfTextExtraction(base64Data) {
         var editorUrl = webBase + "/tailor?draft=" + encodeURIComponent(draftId || "");
         window.open(editorUrl, "_blank");
         flash("Editor opened! Tailoring your resume...");
+        trackExtension("extension_tailor_completed", {
+          draft_id: draftId || "",
+          score: analysis.score,
+        });
       } else {
         throw new Error((resp.error) || "Failed to create draft. Make sure you are logged in.");
       }

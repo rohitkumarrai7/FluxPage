@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fluxpage — ATS Resume Assistant",
-  "version": "2.0.0",
+  "version": "5.0.0",
   "description": "Tailor your resume to any job in 30 seconds. ATS scoring, cover letters, and job tracking.",
   "action": {
     "default_title": "Fluxpage"
@@ -15,10 +15,11 @@
     "offscreen"
   ],
   "host_permissions": [
-    "https://www.fluxpage.com/*",
-    "https://fluxpage.com/*",
+    "http://localhost:8000/*",
+    "http://localhost:3000/*",
     "https://*.convex.site/*",
     "https://*.convex.cloud/*",
+    "https://us.i.posthog.com/*",
     "https://www.linkedin.com/*",
     "https://*.linkedin.com/*",
     "https://internshala.com/*",
@@ -34,7 +35,7 @@
     "service_worker": "background.js"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://www.fluxpage.com https://fluxpage.com https://*.convex.site https://*.convex.cloud https://unpkg.com"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' http://localhost:8000 http://localhost:3000 https://*.convex.site https://*.convex.cloud https://unpkg.com https://us.i.posthog.com"
   },
   "content_scripts": [
     {

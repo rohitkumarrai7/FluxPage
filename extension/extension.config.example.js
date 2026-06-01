@@ -3,6 +3,8 @@ const CONFIG = {
   API_BASE: "https://stoic-caiman-320.convex.site",
   WEB_BASE: "http://localhost:3000",
   LOCAL_PDF_API: "http://localhost:8000",
+  POSTHOG_KEY: "",
+  POSTHOG_HOST: "https://us.i.posthog.com",
 };
 
 if (typeof globalThis !== "undefined") {

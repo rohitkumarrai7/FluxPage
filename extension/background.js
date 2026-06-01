@@ -1,5 +1,5 @@
 try {
-  importScripts("config.generated.js");
+  importScripts("config.generated.js", "lib/analytics.js");
 } catch (e) {
   /* config.generated.js — run npm run build in extension/ */
 }
@@ -161,7 +161,17 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
           break;
         }
         case "TRACK_ANALYTICS": {
+          var analytics = globalThis.__FLUXPAGE_ANALYTICS__;
+          if (analytics && msg.payload && msg.payload.event) {
+            await analytics.capture(msg.payload.event, msg.payload.properties || {});
+          }
           sendResponse({ ok: true });
+          break;
+        }
+        case "GET_FEATURE_FLAGS": {
+          var ph = globalThis.__FLUXPAGE_ANALYTICS__;
+          var flags = ph ? await ph.getFeatureFlags(!!(msg.payload && msg.payload.force)) : {};
+          sendResponse({ ok: true, data: flags });
           break;
         }
         case "AUTH_STATUS": {
@@ -460,7 +470,17 @@ async function fetchUserProfile() {
       headers: headers
     });
     if (!res.ok) throw new Error("API " + res.status);
-    return await res.json();
+    var profile = await res.json();
+    var ph = globalThis.__FLUXPAGE_ANALYTICS__;
+    if (ph && profile && profile.id) {
+      await ph.aliasUser(profile.id);
+      await ph.capture("$identify", {
+        tier: profile.tier || "free",
+        email: profile.email,
+        source: "chrome_extension",
+      });
+    }
+    return profile;
   } catch (e) {
     return null;
   }
