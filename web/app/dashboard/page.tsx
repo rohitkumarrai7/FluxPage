@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import Link from "next/link";
 import { CHROME_EXTENSION_STORE_URL } from "@/lib/contact";
 import { PageHeader, StatCard, Card, Button, Badge, SpinnerCenter, AtsEnterpriseResults } from "@/components/ui";
@@ -67,6 +68,7 @@ export default function DashboardPage() {
     if (planInfo?.usage) {
       const { resumesCount, resumesLimit } = planInfo.usage;
       if (resumesLimit >= 0 && resumesCount >= resumesLimit) {
+        analytics.planLimitReached({ limit_type: "resumes", tier: planInfo.tier });
         alert(`Resume limit reached (${resumesLimit} on ${planInfo.tier} plan). Delete a resume or upgrade your plan.`);
         if (fileRef.current) fileRef.current.value = "";
         return;
@@ -75,6 +77,7 @@ export default function DashboardPage() {
     setUploadingResume(true);
     try {
       await api.resumes.upload(file);
+      analytics.resumeUploaded({ source: "dashboard_home" });
       await load();
     } catch (err: any) {
       alert(err.message || "Upload failed");
@@ -97,6 +100,7 @@ export default function DashboardPage() {
         return;
       }
       const result = await api.ats.analyzeEnterprise(resumeText, atsJobDescription);
+      analytics.atsAnalyzed({ score: result.score || 0, has_jd: !!atsJobDescription.trim() });
       setAtsResult(result);
     } catch (err: any) {
       alert(err.message || "ATS analysis failed");

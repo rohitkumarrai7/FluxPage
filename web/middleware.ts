@@ -13,6 +13,7 @@ const isPublicRoute = createRouteMatcher([
   "/privacy(.*)",
   "/terms(.*)",
   "/api/(.*)",
+  "/ingest(.*)",
 ]);
 
 const protectedMiddleware = clerkMiddleware(async (auth, request) => {
@@ -31,7 +32,7 @@ export default function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icons/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons/|ingest).*)",
     "/(api|trpc)(.*)",
   ],
 };

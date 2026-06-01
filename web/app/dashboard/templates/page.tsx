@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import { PageHeader, EmptyState, Button, Card, SpinnerCenter } from "@/components/ui";
 import { RESUME_TEMPLATES, type TemplateVariant, slugToVariant } from "@/components/resume/templates";
 import { ResumeLayout } from "@/components/resume/templates/layouts";
@@ -83,6 +84,7 @@ export default function TemplatesPage() {
 
   function useTemplate(template: Template) {
     localStorage.setItem("rf_preferred_template", template.slug);
+    analytics.templateSelected({ template_id: template.slug });
     setSelectedSlug(template.slug);
 
     const lastDraft = localStorage.getItem("rf_last_draft_id");

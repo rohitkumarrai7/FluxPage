@@ -3,6 +3,7 @@
 import { useState, useRef, Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import { CHROME_EXTENSION_STORE_URL } from "@/lib/contact";
 import { Logo, Card, Button, SpinnerCenter, CeoAgencyCredit } from "@/components/ui";
 
@@ -43,6 +44,7 @@ function OnboardingContent() {
     setError("");
     try {
       const result = await api.resumes.upload(file);
+      analytics.resumeUploaded({ source: "onboarding" });
       setResumeId(result.id);
       const text = result.text || result.textPreview || "";
       if (!text || text.length < 20) {

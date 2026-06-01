@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { clerkAppearance } from "@/lib/clerkAppearance";
 import { clerkConfigured, clerkPublishableKey } from "@/lib/clerkConfig";
+import { PostHogShell } from "@/components/analytics/PostHogShell";
 import "./globals.css";
 
 const inter = Inter({
@@ -37,8 +38,8 @@ export const metadata: Metadata = {
   publisher: "CEO.AGENCY",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const shell = (
+function AppBody({ children }: { children: React.ReactNode }) {
+  return (
     <html lang="en">
       <head>
         <link rel="icon" href="/brand/logo-mark.svg" type="image/svg+xml" />
@@ -50,18 +51,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Auth is not configured yet. Set Clerk environment variables in your host to enable sign-in.
           </div>
         )}
-        {children}
+        <PostHogShell>{children}</PostHogShell>
       </body>
     </html>
   );
+}
 
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   if (!clerkConfigured || !clerkPublishableKey) {
-    return shell;
+    return <AppBody>{children}</AppBody>;
   }
 
   return (
     <ClerkProvider appearance={clerkAppearance} publishableKey={clerkPublishableKey}>
-      {shell}
+      <AppBody>{children}</AppBody>
     </ClerkProvider>
   );
 }

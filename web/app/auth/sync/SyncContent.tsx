@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { AuthLayout, Button, Spinner } from "@/components/ui";
+import { analytics, identifyUser } from "@/lib/analytics";
 
 export default function SyncContent() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -33,6 +34,19 @@ export default function SyncContent() {
         localStorage.setItem("rf_access_token", data.tokens.access);
         localStorage.setItem("rf_refresh_token", data.tokens.refresh);
         localStorage.setItem("rf_user", JSON.stringify(data.user));
+
+        identifyUser(data.user.id, {
+          email: data.user.email,
+          name: data.user.name || undefined,
+          tier: data.user.tier || "free",
+          onboarding_completed: data.user.onboardingCompleted ?? false,
+        });
+
+        if (data.user.onboardingCompleted) {
+          analytics.userSignedIn({ tier: data.user.tier || "free" });
+        } else {
+          analytics.userSignedUp({ tier: data.user.tier || "free" });
+        }
 
         const redirect = searchParams.get("redirect");
         if (redirect) {

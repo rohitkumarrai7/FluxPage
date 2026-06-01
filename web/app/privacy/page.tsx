@@ -76,10 +76,18 @@ export default function PrivacyPage() {
             AI models without your consent.
           </p>
 
+          <h2 className="text-lg font-semibold mt-8">Analytics</h2>
+          <p className="text-muted">
+            We use PostHog to understand product usage (page views, feature clicks, conversion funnels) and to improve
+            Fluxpage. On the website, session replay may record interactions with sensitive fields masked. We do not
+            send resume text, job descriptions, or cover letter content to PostHog—only metadata such as scores, plan
+            tier, and action types. The Chrome extension sends similar usage events when you analyze or tailor jobs.
+          </p>
+
           <h2 className="text-lg font-semibold mt-8">Third-party services</h2>
           <p className="text-muted">
-            We use trusted providers for authentication, hosting, payments, and AI processing. Data is encrypted in
-            transit (HTTPS). Access is limited to what is needed to operate Fluxpage.
+            We use trusted providers for authentication, hosting, payments, AI processing, and analytics (including
+            PostHog). Data is encrypted in transit (HTTPS). Access is limited to what is needed to operate Fluxpage.
           </p>
 
           <h2 className="text-lg font-semibold mt-8">Retention and deletion</h2>

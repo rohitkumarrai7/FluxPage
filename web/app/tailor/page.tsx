@@ -22,6 +22,8 @@ import { AnimatedScore } from "@/components/ui/AnimatedScore";
 import { InlineDiffResume } from "@/components/tailor/InlineDiffResume";
 import { JobSidebar } from "@/components/tailor/JobSidebar";
 import { boostUntilTargetScore, extractJDKeywordsSync, countKeywordMatches } from "@/lib/atsBoost";
+import { analytics } from "@/lib/analytics";
+import { useFluxFlag } from "@/hooks/useFeatureFlag";
 
 type WizardStep = "tailor" | "template" | "download";
 type Intensity = "low" | "medium" | "high";
@@ -64,6 +66,8 @@ function TailorContent() {
   const [downloadError, setDownloadError] = useState("");
   const [jdKeywords, setJdKeywords] = useState<string[]>([]);
   const [isBoosting, setIsBoosting] = useState(false);
+  const [docxExportEnabled, setDocxExportEnabled] = useState(false);
+  const newTailorWizard = useFluxFlag("new-tailor-wizard");
 
   const snapshotsRef = useRef<Map<string, StructuredResume>>(new Map());
 
@@ -93,6 +97,13 @@ function TailorContent() {
   useEffect(() => {
     const saved = localStorage.getItem("rf_preferred_template");
     if (saved) setTemplate(slugToVariant(saved));
+  }, []);
+
+  useEffect(() => {
+    if (!api.auth.isLoggedIn()) return;
+    api.auth.getProfile().then((profile) => {
+      setDocxExportEnabled(!!profile.usage?.docxExportEnabled);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -193,6 +204,10 @@ function TailorContent() {
         localStorage.setItem("rf_last_draft_id", draftId);
         setInitialScore(data.initialScore ?? data.context?.analysis?.initialScore ?? null);
         setScore(data.currentAtsScore ?? data.context?.analysis?.currentScore ?? null);
+        analytics.tailorOpened({
+          draft_id: draftId,
+          initial_score: data.initialScore ?? data.context?.analysis?.initialScore ?? undefined,
+        });
 
         const gap = data.context?.analysis?.gapAnalysis || {};
         const gapMatched = gap.matchedKeywords || [];
@@ -293,6 +308,7 @@ function TailorContent() {
       s.id === id ? { ...s, applied: true } : s
     );
     setSuggestions(nextSuggestions);
+    analytics.tailorSuggestionApplied({ count: 1, type: suggestion.type });
     rescore(nextResume).then((newScore) =>
       persistState(nextResume, nextSuggestions, newScore)
     );
@@ -330,6 +346,7 @@ function TailorContent() {
     setSuggestions(nextSuggestions);
 
     setIsBoosting(true);
+    const scoreBefore = score ?? initialScore ?? 0;
     try {
       const boosted = await boostUntilTargetScore(
         nextResume,
@@ -342,6 +359,8 @@ function TailorContent() {
       setScore(boosted.score);
       setMatchedKeywords(boosted.matchedKeywords);
       setMissingKeywords(boosted.missingKeywords);
+      analytics.tailorSuggestionApplied({ count: nextSuggestions.filter((s) => s.applied).length, type: "bulk" });
+      analytics.tailorBoostCompleted({ score_before: scoreBefore, score_after: boosted.score });
       await persistState(boosted.resume, nextSuggestions, boosted.score);
     } finally {
       setIsBoosting(false);
@@ -385,6 +404,7 @@ function TailorContent() {
         fontSize,
         lineSpacing,
       });
+      analytics.pdfDownloaded({ template });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "PDF download failed";
       setDownloadError(msg);
@@ -396,8 +416,14 @@ function TailorContent() {
 
   async function downloadDocx() {
     if (!resume) return;
+    if (!docxExportEnabled) {
+      setDownloadError("DOCX export requires a Pro or Premium plan.");
+      return;
+    }
+    setDownloadError("");
     const { exportAsDocx } = await import("@/lib/exportResume");
     await exportAsDocx(resume, `${filename}.docx`);
+    analytics.docxDownloaded({ template });
   }
 
   function downloadLatex() {
@@ -450,6 +476,11 @@ function TailorContent() {
         <div className="flex items-center gap-4">
           <div className="leading-tight">
             <span className="font-semibold text-sm">{jobTitle || "Tailored Resume"}</span>
+            {newTailorWizard && (
+              <span className="ml-2 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">
+                Beta
+              </span>
+            )}
             {company && <span className="text-xs text-slate-400 ml-2">{company}</span>}
           </div>
         </div>
@@ -524,12 +555,14 @@ function TailorContent() {
               )}
 
               {resume && (
+                <div data-ph-mask>
                 <InlineDiffResume
                   resume={resume}
                   suggestions={suggestions}
                   onAccept={acceptSuggestion}
                   onReject={rejectSuggestion}
                 />
+                </div>
               )}
             </div>
           </div>
@@ -598,6 +631,7 @@ function TailorContent() {
                     key={t.id}
                     onClick={() => {
                       setTemplate(t.id);
+                      analytics.templateSelected({ template_id: t.id });
                       const slug = `${t.id}-ats`;
                       localStorage.setItem("rf_preferred_template", slug);
                       if (draftId && resume) {
@@ -757,8 +791,13 @@ function TailorContent() {
                 >
                   {isDownloading ? "Generating PDF..." : "Download PDF"}
                 </button>
-                <button onClick={downloadDocx} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-                  Download DOCX
+                <button
+                  onClick={downloadDocx}
+                  disabled={!docxExportEnabled}
+                  title={docxExportEnabled ? undefined : "Upgrade to Pro for DOCX export"}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {docxExportEnabled ? "Download DOCX" : "Download DOCX (Pro+)"}
                 </button>
                 <button onClick={downloadLatex} className="w-full px-4 py-2 bg-[var(--focus-input)] border border-[var(--focus-border)] text-slate-300 rounded-lg text-sm hover:bg-[var(--focus-surface)] transition-colors">
                   Download .tex

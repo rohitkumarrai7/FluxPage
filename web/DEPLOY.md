@@ -213,6 +213,16 @@ If the GitHub repo was recreated, reconnect Git in **Project → Settings → Gi
 - [ ] Extension login opens fluxpage.com and returns tokens to `callback.html`
 - [ ] Toolbar icon shows Fluxpage brand (not a generic placeholder)
 - [ ] ATS analyze works on LinkedIn job page with signed-in user
+- [ ] PostHog Live Events shows `$pageview` on fluxpage.com (requires `NEXT_PUBLIC_POSTHOG_KEY` in Vercel)
+- [ ] Extension events (`extension_analyze_completed`, etc.) appear after setting `EXTENSION_POSTHOG_KEY` and rebuilding
+
+### PostHog (project 438349)
+
+1. Copy **Project API Key** from [PostHog project settings](https://us.posthog.com/project/438349/settings).
+2. Vercel → **Environment Variables** → `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST=/ingest`.
+3. Redeploy web. Events proxy through `https://www.fluxpage.com/ingest/*`.
+4. For extension: `EXTENSION_POSTHOG_KEY=<same key>` then `npm run extension:build`.
+5. Optional feature flag in PostHog UI: `new-tailor-wizard` (shows Beta badge on tailor page when enabled).
 
 ---
 
@@ -225,6 +235,8 @@ If the GitHub repo was recreated, reconnect Git in **Project → Settings → Gi
 | Clerk | `NEXT_PUBLIC_CLERK_*`, `CLERK_SECRET_KEY`, `CLERK_SYNC_SECRET` |
 | Razorpay | `NEXT_PUBLIC_RAZORPAY_*`, `RAZORPAY_*` |
 | AI | `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `LLM_*` |
+| Analytics | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST=/ingest` |
+| Extension analytics | `EXTENSION_POSTHOG_KEY` (same key as web; set when running `extension:build`) |
 | CORS | `ALLOWED_ORIGINS` |
 
 Never commit `.env.local` to git.

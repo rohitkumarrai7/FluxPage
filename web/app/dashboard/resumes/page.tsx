@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import { PageHeader, EmptyState, Button, Card, SpinnerCenter, AtsEnterpriseResults } from "@/components/ui";
 import type { AtsAnalysisResult } from "@/lib/atsNormalize";
 
@@ -39,6 +40,7 @@ export default function ResumesPage() {
     setUploadSuccess("");
     try {
       await api.resumes.upload(file);
+      analytics.resumeUploaded({ source: "dashboard" });
       await loadResumes();
       setUploadSuccess(`"${file.name}" uploaded and parsed successfully.`);
     } catch (err: any) {
@@ -81,6 +83,7 @@ export default function ResumesPage() {
         return;
       }
       const result = await api.ats.analyzeEnterprise(resumeText, jdForAnalysis);
+      analytics.atsAnalyzed({ score: result.score || 0, has_jd: true });
       setAnalysisMap((prev) => ({
         ...prev,
         [resume.id]: result,

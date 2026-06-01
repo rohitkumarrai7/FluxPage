@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type User } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import { PageHeader, Card, Badge, PricingGrid } from "@/components/ui";
 
 declare global {
@@ -61,6 +62,7 @@ export default function BillingPage() {
     }
 
     setLoadingTier(tier);
+    analytics.billingUpgradeStarted({ target_tier: tier });
     try {
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded || !window.Razorpay) {
@@ -122,6 +124,10 @@ export default function BillingPage() {
 
           const result = await verifyRes.json();
           const newTier = result.tier || tier;
+          analytics.billingUpgradeCompleted({
+            tier: newTier,
+            amount_paise: data.amount,
+          });
           api.auth.updateStoredTier(newTier);
           setUser((prev) => (prev ? { ...prev, tier: newTier } : prev));
           setMessage(`Upgraded to ${newTier} successfully.`);
