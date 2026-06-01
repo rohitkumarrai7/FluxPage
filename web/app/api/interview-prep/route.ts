@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CONVEX_HTTP_URL } from "@/lib/convexDeployment";
 import { chatWithFallback } from "@/lib/llm";
+
+const API_URL = CONVEX_HTTP_URL;
 
 const SYSTEM_PROMPT = `You are an expert interview coach. Generate interview preparation questions and talking points.
 
@@ -14,6 +17,24 @@ Rules:
 
 export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const profileRes = await fetch(`${API_URL}/v1/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        const tier = profile.tier || "free";
+        if (tier !== "pro" && tier !== "premium") {
+          return NextResponse.json(
+            { error: "Interview prep requires a Pro or Premium plan." },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const body = await req.json();
     const { resumeText, jobDescription, jobTitle, company } = body;
 

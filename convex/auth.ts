@@ -245,6 +245,8 @@ export const getProfile = query({
         resumesCount: resumeCount,
         resumesLimit: plan.maxResumes,
         coverLettersEnabled: plan.coverLetters,
+        docxExportEnabled: plan.docxExport,
+        interviewPrepEnabled: plan.interviewPrep,
         analysesThisMonth: tailorsUsed,
         analysesLimit: plan.tailorsPerMonth,
         compilationsThisMonth: user.compilationsCount,

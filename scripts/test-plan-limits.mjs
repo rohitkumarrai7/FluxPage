@@ -12,9 +12,11 @@ const planLimitsSrc = readFileSync(resolve(__dirname, "../convex/planLimits.ts")
 const pricingSrc = readFileSync(resolve(__dirname, "../web/lib/pricingPlans.ts"), "utf8");
 
 const checks = [
-  ["free tailors 5", /free:.*tailorsPerMonth: 5/s.test(planLimitsSrc)],
-  ["free resumes 3", /free:.*maxResumes: 3/s.test(planLimitsSrc)],
-  ["pro tailors 100", /pro:.*tailorsPerMonth: 100/s.test(planLimitsSrc)],
+  ["free tailors 5", /free:\s*\{[\s\S]*?tailorsPerMonth:\s*5,/.test(planLimitsSrc)],
+  ["free resumes 3", /free:\s*\{[\s\S]*?maxResumes:\s*3,/.test(planLimitsSrc)],
+  ["pro tailors 100", /pro:\s*\{[\s\S]*?tailorsPerMonth:\s*100,/.test(planLimitsSrc)],
+  ["pro resumes 20", /pro:\s*\{[\s\S]*?maxResumes:\s*20,/.test(planLimitsSrc)],
+  ["premium unlimited tailors", /premium:\s*\{[\s\S]*?tailorsPerMonth:\s*-1,/.test(planLimitsSrc)],
   ["pricing mentions 5 tailors", /5 tailors\/month/.test(pricingSrc)],
   ["pricing mentions 3 resumes", /3 resumes/.test(pricingSrc)],
 ];

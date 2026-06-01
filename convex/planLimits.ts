@@ -3,13 +3,36 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 export type PlanTier = "free" | "pro" | "premium";
 
-export const PLAN_LIMITS: Record<
-  PlanTier,
-  { tailorsPerMonth: number; maxResumes: number; coverLetters: boolean }
-> = {
-  free: { tailorsPerMonth: 50, maxResumes: 10, coverLetters: false },
-  pro: { tailorsPerMonth: 100, maxResumes: 20, coverLetters: true },
-  premium: { tailorsPerMonth: -1, maxResumes: -1, coverLetters: true },
+export type PlanFeatures = {
+  tailorsPerMonth: number;
+  maxResumes: number;
+  coverLetters: boolean;
+  docxExport: boolean;
+  interviewPrep: boolean;
+};
+
+export const PLAN_LIMITS: Record<PlanTier, PlanFeatures> = {
+  free: {
+    tailorsPerMonth: 5,
+    maxResumes: 3,
+    coverLetters: false,
+    docxExport: false,
+    interviewPrep: false,
+  },
+  pro: {
+    tailorsPerMonth: 100,
+    maxResumes: 20,
+    coverLetters: true,
+    docxExport: true,
+    interviewPrep: true,
+  },
+  premium: {
+    tailorsPerMonth: -1,
+    maxResumes: -1,
+    coverLetters: true,
+    docxExport: true,
+    interviewPrep: true,
+  },
 };
 
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -98,5 +121,19 @@ export function assertCoverLetterAccess(tier: string | undefined) {
   const limits = getLimits(tier);
   if (!limits.coverLetters) {
     throw new Error("Cover letters require a Pro or Premium plan.");
+  }
+}
+
+export function assertDocxExportAccess(tier: string | undefined) {
+  const limits = getLimits(tier);
+  if (!limits.docxExport) {
+    throw new Error("DOCX export requires a Pro or Premium plan.");
+  }
+}
+
+export function assertInterviewPrepAccess(tier: string | undefined) {
+  const limits = getLimits(tier);
+  if (!limits.interviewPrep) {
+    throw new Error("Interview prep requires a Pro or Premium plan.");
   }
 }

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { scoreResumeAgainstJD } from "./atsScoring";
+import { assertCanCreateTailor, incrementTailorUsage } from "./planLimits";
 
 export const create = mutation({
   args: {
@@ -13,6 +14,8 @@ export const create = mutation({
     company: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertCanCreateTailor(ctx, args.userId);
+
     const beforeResult = scoreResumeAgainstJD(args.resumeText, args.jobDescription);
     const scoreBefore = beforeResult.overallScore;
 
@@ -25,19 +28,7 @@ export const create = mutation({
       suggestions: [],
     });
 
-    // Track usage
-    const user = await ctx.db.get(args.userId);
-    if (user) {
-      const now = Date.now();
-      const resetAt = user.tailorsResetAt || 0;
-      const monthMs = 30 * 24 * 60 * 60 * 1000;
-      const current = (now - resetAt > monthMs) ? 0 : (user.tailorsThisMonth || 0);
-      await ctx.db.patch(args.userId, {
-        tailorsThisMonth: current + 1,
-        tailorsResetAt: (now - resetAt > monthMs) ? now : resetAt,
-        analysesCount: (user.analysesCount || 0) + 1,
-      });
-    }
+    await incrementTailorUsage(ctx, args.userId);
 
     await ctx.db.insert("usageEvents", {
       userId: args.userId,
