@@ -1,44 +1,42 @@
 import type { StructuredResume } from "./resumeParser";
 import { structuredResumeToText } from "./resumeParser";
+import { extractRegexKeywords } from "./jdAnalyzer";
+import { filterTailorKeywords } from "./tailorKeywords";
 
-const STRONG_VERBS = [
-  "Led", "Engineered", "Built", "Delivered", "Drove", "Achieved",
-  "Spearheaded", "Optimized", "Launched", "Scaled", "Managed", "Developed",
-];
+const EDITABLE_SECTION_TYPES = new Set(["summary", "skills"]);
 
-const DOMAIN_PATTERN = /\b(business\s*development|inside\s*sales|outside\s*sales|sales|marketing|lead\s*generation|prospecting|cold\s*calling|pipeline|crm|salesforce|hubspot|account\s*management|client\s*acquisition|market\s*research|market\s*analysis|asset\s*sourcing|proactive\s*outreach|new\s*product\s*development|launch\s*planning|stakeholder|partnership|negotiation|international|excel|powerpoint|social\s*media|content\s*marketing|digital\s*marketing|go[- ]to[- ]market|product\s*launch|due\s*diligence|financial\s*modeling|relationship\s*building|competitive\s*analysis|revenue|outreach|networking|strategy|consulting|operations|analytics|reporting|customer\s*success|cross[- ]border|presenting|communication|collaboration|leadership)\b/gi;
-
-const PHRASE_PATTERN = /\b(new product development|asset sourcing|proactive outreach|business development|launch planning|market research|lead generation|account management|client acquisition|stakeholder management|strategic partnership|go-to-market|go to market|product launch|pipeline development|relationship building|competitive analysis|financial modeling|due diligence|inside sales|social media marketing|content marketing|digital marketing|email marketing|project management|customer success|revenue growth)\b/gi;
-
-/** Extract ATS-target keywords from JD text (sync, no LLM). */
+/** Extract ATS-target keywords from JD text (sync, all industries). */
 export function extractJDKeywordsSync(jdText: string, jobTitle?: string): string[] {
-  const terms = new Set<string>();
-  const sources = [jobTitle || "", jdText].filter(Boolean);
-
-  for (const src of sources) {
-    let m;
-    const domainRe = new RegExp(DOMAIN_PATTERN.source, "gi");
-    while ((m = domainRe.exec(src)) !== null) {
-      terms.add(m[0].toLowerCase().replace(/\s+/g, " "));
-    }
-    const phraseRe = new RegExp(PHRASE_PATTERN.source, "gi");
-    while ((m = phraseRe.exec(src)) !== null) {
-      terms.add(m[0].toLowerCase().replace(/\s+/g, " "));
-    }
-  }
-
-  for (const line of jdText.split("\n")) {
-    const clean = line.replace(/^[-•*▪▸►◆]\s*/, "").trim();
-    if (clean.length >= 12 && clean.length <= 65) {
-      terms.add(clean.toLowerCase());
-    }
-  }
-
-  return [...terms].filter((t) => t.length > 2).slice(0, 30);
+  return extractRegexKeywords(jdText, jobTitle).slice(0, 20);
 }
 
 function resumeContainsKeyword(resumeText: string, kw: string): boolean {
   return resumeText.toLowerCase().includes(kw.toLowerCase());
+}
+
+/** Snapshot of sections that must never be auto-modified (experience, education, languages, etc.). */
+export function getProtectedSectionTexts(resume: StructuredResume): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const section of resume.sections) {
+    if (EDITABLE_SECTION_TYPES.has(section.type)) continue;
+    out[section.id] = section.items.map((i) => i.text);
+  }
+  return out;
+}
+
+export function protectedSectionsUnchanged(before: StructuredResume, after: StructuredResume): boolean {
+  const a = getProtectedSectionTexts(before);
+  const b = getProtectedSectionTexts(after);
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    const left = a[key] || [];
+    const right = b[key] || [];
+    if (left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) {
+      if (left[i] !== right[i]) return false;
+    }
+  }
+  return true;
 }
 
 function ensureSkillsSection(resume: StructuredResume): StructuredResume {
@@ -56,10 +54,13 @@ function ensureSkillsSection(resume: StructuredResume): StructuredResume {
 }
 
 function injectKeywordsToSkills(resume: StructuredResume, keywords: string[]): StructuredResume {
+  const safe = filterTailorKeywords(keywords).slice(0, 12);
+  if (safe.length === 0) return resume;
+
   const next = ensureSkillsSection(resume);
   const skills = next.sections.find((s) => s.type === "skills")!;
   const existing = skills.items.map((i) => i.text).join(" ").toLowerCase();
-  const toAdd = keywords.filter((kw) => !existing.includes(kw.toLowerCase()));
+  const toAdd = safe.filter((kw) => !existing.includes(kw.toLowerCase()));
   if (toAdd.length === 0) return next;
 
   if (skills.items.length === 1 && skills.items[0].text.length > 0) {
@@ -72,94 +73,31 @@ function injectKeywordsToSkills(resume: StructuredResume, keywords: string[]): S
   return next;
 }
 
-function rewriteSummaryForRole(
-  resume: StructuredResume,
-  jobTitle: string,
-  keywords: string[]
-): StructuredResume {
-  const next = JSON.parse(JSON.stringify(resume)) as StructuredResume;
-  let summary = next.sections.find((s) => s.type === "summary");
-  if (!summary) {
-    summary = { id: "summary-auto", type: "summary", heading: "Professional Summary", items: [{ id: "sum-0", text: "" }], order: 0 };
-    next.sections.unshift(summary);
-  }
+function enrichSummaryKeywords(resume: StructuredResume, keywords: string[]): StructuredResume {
+  const safe = filterTailorKeywords(keywords).slice(0, 5);
+  if (safe.length === 0) return resume;
 
-  const topKw = keywords.slice(0, 8).join(", ");
-  const role = jobTitle || "target role";
-  const existing = summary.items.map((i) => i.text).join(" ").trim();
-  const opener = `Results-driven ${role} professional with proven expertise in ${topKw}.`;
-
-  if (existing.length < 20) {
-    summary.items = [{ id: summary.items[0]?.id || "sum-0", text: `${opener} Skilled in driving measurable outcomes through strategic execution and cross-functional collaboration.` }];
-  } else if (!keywords.some((k) => existing.toLowerCase().includes(k.toLowerCase()))) {
-    summary.items[0].text = `${opener} ${existing}`;
-  } else {
-    const missing = keywords.filter((k) => !existing.toLowerCase().includes(k.toLowerCase())).slice(0, 4);
-    if (missing.length > 0) {
-      summary.items[0].text = `${existing} Core competencies include ${missing.join(", ")}.`;
-    }
-  }
-  return next;
-}
-
-function strengthenBullets(resume: StructuredResume, keywords: string[]): StructuredResume {
-  const next = JSON.parse(JSON.stringify(resume)) as StructuredResume;
-  let kwIdx = 0;
-
-  for (const section of next.sections) {
-    if (section.type === "summary" || section.type === "skills") continue;
-    for (const item of section.items) {
-      if (item.metadata?.role || item.metadata?.degree || !item.text) continue;
-
-      let text = item.text.trim();
-      const lower = text.toLowerCase();
-
-      if (!STRONG_VERBS.some((v) => lower.startsWith(v.toLowerCase()))) {
-        const verb = STRONG_VERBS[kwIdx % STRONG_VERBS.length];
-        text = `${verb} ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
-      }
-
-      if (!/\d+%|\d+\+|\$\d| \d+ /i.test(text) && kwIdx % 2 === 0) {
-        text = text.replace(/\.$/, "") + ", improving efficiency by 25%.";
-      }
-
-      const kw = keywords[kwIdx % keywords.length];
-      if (kw && !lower.includes(kw.toLowerCase()) && text.length < 220) {
-        text = text.replace(/\.$/, "") + ` — leveraging ${kw}.`;
-        kwIdx++;
-      }
-
-      item.text = text;
-    }
-  }
-  return next;
-}
-
-function injectJDSemanticPhrases(
-  resume: StructuredResume,
-  jobDescription: string
-): StructuredResume {
   const next = JSON.parse(JSON.stringify(resume)) as StructuredResume;
   const summary = next.sections.find((s) => s.type === "summary");
-  if (!summary?.items.length) return next;
+  if (!summary) return next;
 
-  const jdPhrases = jobDescription
-    .split("\n")
-    .map((l) => l.replace(/^[-•*▪▸►◆]\s*/, "").trim())
-    .filter((l) => l.length >= 20 && l.length <= 120)
-    .slice(0, 3);
+  const existing = summary.items.map((i) => i.text).join(" ").trim();
+  if (existing.length < 10) return next;
 
-  if (jdPhrases.length === 0) return next;
+  const missing = safe.filter((k) => !existing.toLowerCase().includes(k.toLowerCase()));
+  if (missing.length === 0) return next;
 
-  const existing = summary.items[0].text;
-  const phraseBlock = jdPhrases.join(" ");
-  if (!existing.toLowerCase().includes(jdPhrases[0].slice(0, 20).toLowerCase())) {
-    summary.items[0].text = `${existing} ${phraseBlock}`.slice(0, 600);
-  }
+  const addition = ` Relevant expertise includes ${missing.slice(0, 3).join(", ")}.`;
+  if (existing.length + addition.length > 500) return next;
+
+  summary.items[0].text = `${existing.replace(/\s+$/, "")}${addition}`;
   return next;
 }
 
-/** Single-pass deterministic ATS boost targeting 80+ score. */
+/**
+ * Safe deterministic ATS boost for any resume layout.
+ * Only summary and skills may change — all other sections are preserved exactly.
+ */
 export function applyAtsBoost(
   resume: StructuredResume,
   jobDescription: string,
@@ -167,21 +105,22 @@ export function applyAtsBoost(
   atsMissingKeywords: string[] = []
 ): StructuredResume {
   const jdKeywords = extractJDKeywordsSync(jobDescription, jobTitle);
-  const allTarget = [...new Set([...jdKeywords, ...atsMissingKeywords])];
+  const allTarget = filterTailorKeywords([...new Set([...jdKeywords, ...atsMissingKeywords])]);
   const resumeText = structuredResumeToText(resume);
   const stillMissing = allTarget.filter((k) => !resumeContainsKeyword(resumeText, k));
 
   let boosted = resume;
-  boosted = rewriteSummaryForRole(boosted, jobTitle, stillMissing.length > 0 ? stillMissing : allTarget);
-  boosted = injectJDSemanticPhrases(boosted, jobDescription);
+  boosted = enrichSummaryKeywords(boosted, stillMissing);
   boosted = injectKeywordsToSkills(boosted, stillMissing);
-  boosted = strengthenBullets(boosted, stillMissing.length > 0 ? stillMissing : allTarget.slice(0, 12));
 
-  // Second skills pass for any keywords still missing after bullet rewrites
   const afterText = structuredResumeToText(boosted);
   const finalMissing = allTarget.filter((k) => !resumeContainsKeyword(afterText, k));
   if (finalMissing.length > 0) {
     boosted = injectKeywordsToSkills(boosted, finalMissing);
+  }
+
+  if (!protectedSectionsUnchanged(resume, boosted)) {
+    return resume;
   }
 
   return boosted;
@@ -205,12 +144,13 @@ export async function boostUntilTargetScore(
   missingKeywords: string[];
 }> {
   const target = options.targetScore ?? 82;
-  const maxIter = options.maxIterations ?? 5;
+  const maxIter = options.maxIterations ?? 2;
   let current = JSON.parse(JSON.stringify(resume)) as StructuredResume;
   let result = await rescore(current);
 
   for (let i = 0; i < maxIter && result.score < target; i++) {
-    current = applyAtsBoost(current, jobDescription, jobTitle, result.missingKeywords);
+    const safeMissing = filterTailorKeywords(result.missingKeywords || []);
+    current = applyAtsBoost(current, jobDescription, jobTitle, safeMissing);
     result = await rescore(current);
   }
 
@@ -218,16 +158,16 @@ export async function boostUntilTargetScore(
     resume: current,
     score: result.score,
     matchedKeywords: result.matchedKeywords,
-    missingKeywords: result.missingKeywords,
+    missingKeywords: filterTailorKeywords(result.missingKeywords || []),
   };
 }
 
-/** Count keyword matches for sidebar gauge. */
 export function countKeywordMatches(resumeText: string, jdKeywords: string[]): { matched: string[]; missing: string[] } {
+  const safe = filterTailorKeywords(jdKeywords);
   const matched: string[] = [];
   const missing: string[] = [];
   const lower = resumeText.toLowerCase();
-  for (const kw of jdKeywords) {
+  for (const kw of safe) {
     if (lower.includes(kw.toLowerCase())) matched.push(kw);
     else missing.push(kw);
   }

@@ -45,5 +45,9 @@ postgres_data/
 convex/_generated/
 .convex/
 
+# Local deploy / dev artifacts
+.vercel/
+.transcript-restore/
+
 # TypeScript build info
 *.tsbuildinfo

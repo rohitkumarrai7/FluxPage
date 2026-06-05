@@ -190,6 +190,13 @@ BE/BTech Computer Science required.
     fail("web-ats", "missing analyzeEnterprise");
   }
 
+  const atsBoostSrc = fs.readFileSync(path.join(root, "..", "web/lib/atsBoost.ts"), "utf8");
+  if (!/leveraging|improving efficiency by 25%/i.test(atsBoostSrc)) {
+    pass("ats-boost-safe", "no bullet corruption patterns in source");
+  } else {
+    fail("ats-boost-safe", "atsBoost still contains corruption patterns");
+  }
+
   console.log(`\n=== Summary: ${results.length - failed} passed, ${failed} failed / ${results.length} ===\n`);
   process.exit(failed > 0 ? 1 : 0);
 }

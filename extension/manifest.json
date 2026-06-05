@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fluxpage — ATS Resume Assistant",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "description": "Tailor your resume to any job in 30 seconds. ATS scoring, cover letters, and job tracking.",
   "action": {
     "default_title": "Fluxpage"

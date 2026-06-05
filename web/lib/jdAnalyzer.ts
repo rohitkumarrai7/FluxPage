@@ -1,4 +1,5 @@
 import { chatWithFallback } from "./llm";
+import { filterTailorKeywords } from "./tailorKeywords";
 
 export interface JDAnalysis {
   hardSkills: string[];
@@ -63,6 +64,11 @@ export async function analyzeJobDescription(
           source: "llm",
         };
 
+        analysis.hardSkills = filterTailorKeywords(analysis.hardSkills);
+        analysis.softSkills = filterTailorKeywords(analysis.softSkills);
+        analysis.tools = filterTailorKeywords(analysis.tools);
+        analysis.keywords = filterTailorKeywords(analysis.keywords);
+
         const allTerms = [
           ...analysis.hardSkills,
           ...analysis.tools,
@@ -78,9 +84,20 @@ export async function analyzeJobDescription(
   return regexFallback(jdText, jobTitle);
 }
 
-const TECH_SKILLS = /\b(python|java|javascript|typescript|react|angular|vue|node\.?js|next\.?js|express|django|flask|spring\s*boot|spring|ruby|rails|go|golang|rust|swift|kotlin|c\+\+|c#|\.net|php|laravel|scala|sql|mysql|postgresql|postgres|mongodb|redis|elasticsearch|kafka|docker|kubernetes|k8s|aws|azure|gcp|terraform|ansible|jenkins|git|github|gitlab|jira|confluence|figma|tableau|power\s*bi|pandas|numpy|tensorflow|pytorch|scikit-learn|keras|spark|hadoop|airflow|snowflake|databricks|graphql|rest\s*api|microservices|ci\/cd|devops|linux|bash|html|css|sass|tailwind|bootstrap|webpack|vite|jest|cypress|selenium|agile|scrum|kanban|machine\s*learning|deep\s*learning|nlp|computer\s*vision|data\s*science|data\s*engineering|data\s*analysis|excel|powerpoint|salesforce|hubspot|sap|oracle|quickbooks|autocad|solidworks|photoshop|illustrator|indesign|premiere|blender|unity|unreal|matlab|r\b|stata|spss|sas|financial\s*modeling|financial\s*analysis|equity\s*research|market\s*analysis|risk\s*management|portfolio\s*management|valuation|bloomberg|factset|morningstar|capital\s*iq|pitchbook|dcf|lbo|m&a|ipo|compliance|regulatory|hipaa|sox|gaap|ifrs|cfa|cpa|frm|series\s*\d+)\b/gi;
+const TECH_SKILLS = /\b(python|java|javascript|typescript|react|angular|vue|node\.?js|next\.?js|express|django|flask|spring\s*boot|spring|ruby|rails|go|golang|rust|swift|kotlin|c\+\+|c#|\.net|php|laravel|scala|sql|mysql|postgresql|postgres|mongodb|redis|elasticsearch|kafka|docker|kubernetes|k8s|aws|azure|gcp|terraform|ansible|jenkins|git|github|gitlab|jira|confluence|figma|tableau|power\s*bi|pandas|numpy|tensorflow|pytorch|scikit-learn|keras|spark|hadoop|airflow|snowflake|databricks|graphql|rest\s*api|microservices|ci\/cd|devops|linux|bash|html|css|sass|tailwind|bootstrap|webpack|vite|jest|cypress|selenium|agile|scrum|kanban|machine\s*learning|deep\s*learning|nlp|computer\s*vision|data\s*science|data\s*engineering|data\s*analysis|excel|powerpoint|salesforce|hubspot|sap|oracle|quickbooks|autocad|solidworks|photoshop|illustrator|indesign|premiere|blender|unity|unreal|matlab|r\b|stata|spss|sas|financial\s*modeling|financial\s*analysis|equity\s*research|market\s*analysis|risk\s*management|portfolio\s*management|valuation|bloomberg|factset|morningstar|capital\s*iq|pitchbook|dcf|lbo|m&a|ipo|compliance|regulatory|hipaa|sox|gaap|ifrs|cfa|cpa|frm|series\s*\d+|patient\s*care|clinical\s*research|emr|ehr|bls|acls|icu|phlebotomy|litigation|legal\s*research|contract\s*drafting|paralegal|curriculum\s*development|classroom\s*management|lesson\s*planning|talent\s*acquisition|onboarding|payroll|workday|hvac|electrical|welding|plumbing|ux\s*design|ui\s*design|user\s*research|wireframing|prototype|seo|sem|google\s*analytics|adobe\s*creative\s*suite|after\s*effects)\b/gi;
 
 const SOFT_SKILLS = /\b(leadership|teamwork|communication|problem[- ]solving|critical\s*thinking|time\s*management|adaptability|collaboration|negotiation|presentation|mentoring|coaching|project\s*management|stakeholder\s*management|strategic\s*planning|decision[- ]making|conflict\s*resolution|emotional\s*intelligence|creativity|innovation|analytical\s*thinking|attention\s*to\s*detail|organizational\s*skills|interpersonal\s*skills|client\s*relations|customer\s*service|business\s*development|account\s*management|cross[- ]functional)\b/gi;
+
+/** Sync keyword extraction for all industries — shared by ATS boost and optimize. */
+export function extractRegexKeywords(jdText: string, jobTitle?: string): string[] {
+  const analysis = regexFallback(jdText, jobTitle);
+  return filterTailorKeywords([
+    ...analysis.hardSkills,
+    ...analysis.tools,
+    ...analysis.keywords,
+    ...analysis.softSkills,
+  ]);
+}
 
 function regexFallback(jdText: string, jobTitle?: string): JDAnalysis {
   const hardSkills = new Set<string>();
@@ -103,21 +120,18 @@ function regexFallback(jdText: string, jobTitle?: string): JDAnalysis {
     softSkills.add(match[0].trim());
   }
 
-  const keywords: string[] = [];
-  const lines = jdText.split("\n");
-  for (const line of lines) {
-    const clean = line.replace(/^[-•*▪▸►◆]\s*/, "").trim();
-    if (clean.length > 10 && clean.length < 80) {
-      const words = clean.split(/\s+/).slice(0, 5).join(" ");
-      if (words.length > 8) keywords.push(words);
-    }
+  const phraseRe = /\b(new product development|asset sourcing|proactive outreach|business development|launch planning|market research|lead generation|account management|stakeholder management|test automation|ui test automation|social media marketing|digital marketing|demand generation|conversion rate optimization|patient care|legal research|curriculum development|talent acquisition|user experience|quality assurance|supply chain|human resources|customer support|technical support|cloud computing|data visualization)\b/gi;
+  const keywords = new Set<string>();
+  let phraseMatch: RegExpExecArray | null;
+  while ((phraseMatch = phraseRe.exec(jdText)) !== null) {
+    keywords.add(phraseMatch[0].toLowerCase().replace(/\s+/g, " "));
   }
 
   return {
-    hardSkills: [...hardSkills].slice(0, 20),
-    softSkills: [...softSkills].slice(0, 10),
-    tools: [...tools].slice(0, 10),
-    keywords: keywords.slice(0, 15),
+    hardSkills: filterTailorKeywords([...hardSkills]).slice(0, 20),
+    softSkills: filterTailorKeywords([...softSkills]).slice(0, 10),
+    tools: filterTailorKeywords([...tools]).slice(0, 10),
+    keywords: filterTailorKeywords([...keywords]).slice(0, 15),
     industry: guessIndustry(jdText, jobTitle),
     roleLevel: "mid",
     source: "regex",
@@ -153,13 +167,13 @@ export function mergeJDKeywordsWithATS(
   const enhanced: string[] = [...atsMatched];
   const enhancedMissing: string[] = [];
 
-  for (const term of allJDTerms) {
+  for (const term of filterTailorKeywords(allJDTerms)) {
     const lower = term.toLowerCase();
     if (matchedSet.has(lower)) continue;
     enhancedMissing.push(term);
   }
 
-  for (const term of atsMissing) {
+  for (const term of filterTailorKeywords(atsMissing)) {
     if (!enhancedMissing.some((e) => e.toLowerCase() === term.toLowerCase())) {
       enhancedMissing.push(term);
     }
@@ -167,6 +181,6 @@ export function mergeJDKeywordsWithATS(
 
   return {
     matchedKeywords: enhanced,
-    missingKeywords: [...new Set(enhancedMissing)].slice(0, 20),
+    missingKeywords: filterTailorKeywords([...new Set(enhancedMissing)]).slice(0, 20),
   };
 }

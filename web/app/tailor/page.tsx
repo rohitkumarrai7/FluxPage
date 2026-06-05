@@ -353,7 +353,7 @@ function TailorContent() {
         jobDescription,
         jobTitle,
         rescoreFull,
-        { targetScore: 82, maxIterations: 6 }
+        { targetScore: 82, maxIterations: 2 }
       );
       setResume(boosted.resume);
       setScore(boosted.score);
