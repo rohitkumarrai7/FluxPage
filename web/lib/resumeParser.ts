@@ -534,11 +534,13 @@ export function applySuggestionToResume(
   }
 
   if (suggestion.type === "rewrite") {
+    const safeText = suggestion.suggestedText.slice(0, 280);
+
     if (suggestion.bulletId) {
       for (const section of next.sections) {
         const bullet = section.items.find((b) => b.id === suggestion.bulletId);
-        if (bullet) {
-          bullet.text = suggestion.suggestedText;
+        if (bullet && !bullet.metadata?.role && !bullet.metadata?.degree) {
+          bullet.text = safeText;
           return next;
         }
       }
@@ -554,17 +556,20 @@ export function applySuggestionToResume(
       );
       const target = contentBullets[suggestion.bulletIndex];
       if (target) {
-        target.text = suggestion.suggestedText;
+        target.text = safeText;
         return next;
       }
     }
 
     if (targetSection && suggestion.originalText) {
       const match = targetSection.items.find(
-        (it) => it.text === suggestion.originalText
+        (it) =>
+          it.text === suggestion.originalText &&
+          !it.metadata?.role &&
+          !it.metadata?.degree
       );
       if (match) {
-        match.text = suggestion.suggestedText;
+        match.text = safeText;
         return next;
       }
     }

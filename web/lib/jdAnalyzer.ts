@@ -1,4 +1,4 @@
-import { chatWithFallback } from "./llm";
+import { chatForTailor } from "./llm";
 import { filterTailorKeywords } from "./tailorKeywords";
 
 export interface JDAnalysis {
@@ -37,14 +37,66 @@ function stripThinkingTags(text: string): string {
     .trim();
 }
 
+function countAnalysisTerms(analysis: JDAnalysis): number {
+  return (
+    analysis.hardSkills.length +
+    analysis.tools.length +
+    analysis.keywords.length +
+    analysis.softSkills.length
+  );
+}
+
+/** Fill only gaps the LLM missed — regex is last-resort supplement, never a full replace. */
+function supplementWithRegexFallback(
+  llm: JDAnalysis,
+  jdText: string,
+  jobTitle?: string
+): JDAnalysis {
+  const regex = regexFallback(jdText, jobTitle);
+  const seen = new Set<string>();
+  for (const t of [...llm.hardSkills, ...llm.tools, ...llm.keywords, ...llm.softSkills]) {
+    seen.add(t.toLowerCase());
+  }
+
+  const addUnique = (from: string[], into: string[]) => {
+    for (const term of from) {
+      const lower = term.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        into.push(term);
+      }
+    }
+  };
+
+  const hardSkills = [...llm.hardSkills];
+  const tools = [...llm.tools];
+  const keywords = [...llm.keywords];
+  const softSkills = [...llm.softSkills];
+
+  addUnique(regex.hardSkills, hardSkills);
+  addUnique(regex.tools, tools);
+  addUnique(regex.keywords, keywords);
+  addUnique(regex.softSkills, softSkills);
+
+  return {
+    hardSkills: filterTailorKeywords(hardSkills).slice(0, 25),
+    softSkills: filterTailorKeywords(softSkills).slice(0, 12),
+    tools: filterTailorKeywords(tools).slice(0, 12),
+    keywords: filterTailorKeywords(keywords).slice(0, 18),
+    industry: llm.industry || regex.industry,
+    roleLevel: llm.roleLevel || regex.roleLevel,
+    source: "llm",
+  };
+}
+
 export async function analyzeJobDescription(
   jdText: string,
   jobTitle?: string
 ): Promise<JDAnalysis> {
   try {
-    const result = await chatWithFallback({
+    const result = await chatForTailor({
       system: JD_SYSTEM_PROMPT,
-      user: `Job Title: ${jobTitle || "Unknown"}\n\nJob Description:\n${jdText.slice(0, 6000)}`,
+      user: `Job Title: ${jobTitle || "Unknown"}\n\nJob Description:\n${jdText.slice(0, 8000)}`,
       temperature: 0.1,
       maxTokens: 2048,
     });
@@ -55,32 +107,25 @@ export async function analyzeJobDescription(
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         const analysis: JDAnalysis = {
-          hardSkills: Array.isArray(parsed.hardSkills) ? parsed.hardSkills : [],
-          softSkills: Array.isArray(parsed.softSkills) ? parsed.softSkills : [],
-          tools: Array.isArray(parsed.tools) ? parsed.tools : [],
-          keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+          hardSkills: filterTailorKeywords(Array.isArray(parsed.hardSkills) ? parsed.hardSkills : []),
+          softSkills: filterTailorKeywords(Array.isArray(parsed.softSkills) ? parsed.softSkills : []),
+          tools: filterTailorKeywords(Array.isArray(parsed.tools) ? parsed.tools : []),
+          keywords: filterTailorKeywords(Array.isArray(parsed.keywords) ? parsed.keywords : []),
           industry: parsed.industry || "",
           roleLevel: parsed.roleLevel || "mid",
           source: "llm",
         };
 
-        analysis.hardSkills = filterTailorKeywords(analysis.hardSkills);
-        analysis.softSkills = filterTailorKeywords(analysis.softSkills);
-        analysis.tools = filterTailorKeywords(analysis.tools);
-        analysis.keywords = filterTailorKeywords(analysis.keywords);
-
-        const allTerms = [
-          ...analysis.hardSkills,
-          ...analysis.tools,
-          ...analysis.keywords,
-        ];
-        if (allTerms.length >= 3) return analysis;
+        if (countAnalysisTerms(analysis) >= 2) {
+          return supplementWithRegexFallback(analysis, jdText, jobTitle);
+        }
       }
     }
   } catch (err) {
     console.error("[jdAnalyzer] LLM extraction failed:", err);
   }
 
+  console.warn("[jdAnalyzer] Falling back to regex-only JD extraction");
   return regexFallback(jdText, jobTitle);
 }
 
@@ -156,31 +201,35 @@ export function mergeJDKeywordsWithATS(
   atsMatched: string[],
   atsMissing: string[]
 ): { matchedKeywords: string[]; missingKeywords: string[] } {
-  const allJDTerms = [
+  // LLM-extracted JD terms take priority; ATS gap keywords second; regex-only terms last.
+  const llmTerms = filterTailorKeywords([
     ...jdAnalysis.hardSkills,
     ...jdAnalysis.tools,
     ...jdAnalysis.keywords,
     ...jdAnalysis.softSkills,
-  ];
+  ]);
 
   const matchedSet = new Set(atsMatched.map((k) => k.toLowerCase()));
   const enhanced: string[] = [...atsMatched];
   const enhancedMissing: string[] = [];
+  const missingSet = new Set<string>();
 
-  for (const term of filterTailorKeywords(allJDTerms)) {
+  for (const term of llmTerms) {
     const lower = term.toLowerCase();
-    if (matchedSet.has(lower)) continue;
+    if (matchedSet.has(lower) || missingSet.has(lower)) continue;
+    missingSet.add(lower);
     enhancedMissing.push(term);
   }
 
   for (const term of filterTailorKeywords(atsMissing)) {
-    if (!enhancedMissing.some((e) => e.toLowerCase() === term.toLowerCase())) {
-      enhancedMissing.push(term);
-    }
+    const lower = term.toLowerCase();
+    if (matchedSet.has(lower) || missingSet.has(lower)) continue;
+    missingSet.add(lower);
+    enhancedMissing.push(term);
   }
 
   return {
     matchedKeywords: enhanced,
-    missingKeywords: filterTailorKeywords([...new Set(enhancedMissing)]).slice(0, 20),
+    missingKeywords: [...enhancedMissing].slice(0, 25),
   };
 }

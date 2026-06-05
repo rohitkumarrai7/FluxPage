@@ -14,6 +14,11 @@ export function getOpenRouterModels(): string[] {
   return [...new Set([primary, "openai/gpt-5.4-mini", "openai/gpt-5.4-nano"].filter(Boolean))];
 }
 
+/** Tailor + JD parsing — same fast OpenRouter chain as general LLM (no Claude required). */
+export function getTailorModels(): string[] {
+  return getOpenRouterModels();
+}
+
 export async function openRouterChat(params: {
   system: string;
   user: string;

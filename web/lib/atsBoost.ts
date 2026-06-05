@@ -131,6 +131,7 @@ export interface BoostUntilTargetOptions {
   maxIterations?: number;
 }
 
+/** @deprecated Test-only — user-facing tailor flow uses LLM suggestions only (LetMeApply model). */
 export async function boostUntilTargetScore(
   resume: StructuredResume,
   jobDescription: string,

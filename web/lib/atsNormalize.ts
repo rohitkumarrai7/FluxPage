@@ -6,6 +6,7 @@ export interface AtsBreakdown {
   formatCompatibility: number;
   impactDensity: number;
   experienceRelevance?: number;
+  industryAlignment?: number;
 }
 
 export interface AtsAnalysisResult {

@@ -1,5 +1,5 @@
 import { isMinimaxConfigured, minimaxChat } from "./minimax";
-import { isOpenRouterConfigured, openRouterChat } from "./openrouter";
+import { isOpenRouterConfigured, openRouterChat, getTailorModels } from "./openrouter";
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -8,6 +8,7 @@ export async function chatWithFallback(params: {
   user: string;
   temperature?: number;
   maxTokens?: number;
+  models?: string[];
 }): Promise<{ content: string; model: string } | null> {
   if (isOpenRouterConfigured()) {
     const or = await openRouterChat(params);
@@ -47,4 +48,14 @@ export async function chatWithFallback(params: {
   }
 
   return null;
+}
+
+/** LLM-first path for tailoring — uses OpenRouter fast models (LLM_MODEL chain). */
+export async function chatForTailor(params: {
+  system: string;
+  user: string;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<{ content: string; model: string } | null> {
+  return chatWithFallback({ ...params, models: getTailorModels() });
 }
