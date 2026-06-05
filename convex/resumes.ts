@@ -92,6 +92,27 @@ export const get = query({
   },
 });
 
+export const getForUser = query({
+  args: { resumeId: v.id("resumes"), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const r = await ctx.db.get(args.resumeId);
+    if (!r || r.userId !== args.userId) throw new Error("Resume not found");
+    return {
+      id: r._id,
+      filename: r.filename,
+      mimeType: r.mimeType,
+      fileSize: r.fileSize,
+      textPreview: r.textPreview,
+      structuredData: r.structuredData,
+      rawText: r.rawText,
+      label: r.label,
+      isDefault: r.isDefault,
+      lastAtsScore: r.lastAtsScore,
+      createdAt: r._creationTime,
+    };
+  },
+});
+
 export const setDefault = mutation({
   args: { resumeId: v.id("resumes"), userId: v.id("users") },
   handler: async (ctx, args) => {

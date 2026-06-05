@@ -29,12 +29,18 @@ export function AtsEnterpriseResults({ result, compact = false }: AtsEnterpriseR
   const softFailures =
     result.knockoutDetails?.failedFilters?.filter((f) => f.severity !== "hard") ?? [];
   const knockoutFailed = result.passedKnockouts === false;
+  const keySkillTotal = result.matchedKeywords.length + result.missingKeywords.length;
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted leading-relaxed">
+        This score estimates keyword and skill fit against this job description. Real employer ATS systems
+        vary by company and are not shown here.
+      </p>
+
       <div className="flex items-center gap-4">
         <div className={`text-4xl font-black ${scoreColor}`}>{result.score}</div>
-        <div className="text-sm text-muted">/100 ATS Score</div>
+        <div className="text-sm text-muted">/100 match estimate</div>
         <span
           className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold ${
             knockoutFailed
@@ -47,18 +53,26 @@ export function AtsEnterpriseResults({ result, compact = false }: AtsEnterpriseR
           }`}
         >
           {knockoutFailed
-            ? "Knockout Failed"
+            ? "Key gaps found"
             : result.score >= 75
-              ? "Good Match"
+              ? "Strong fit"
               : result.score >= 50
-                ? "Fair Match"
-                : "Low Match"}
+                ? "Moderate fit"
+                : "Low fit"}
         </span>
       </div>
 
+      {keySkillTotal > 0 && (
+        <p className="text-xs text-foreground">
+          Matched <span className="font-semibold text-green-700">{result.matchedKeywords.length}</span>
+          {" "}of{" "}
+          <span className="font-semibold">{keySkillTotal}</span> key skills from this job description.
+        </p>
+      )}
+
       {knockoutFailed && hardFailures.length > 0 ? (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800 space-y-1">
-          <div className="font-semibold">Hard knockout — likely auto-rejected by ATS</div>
+          <div className="font-semibold">Important requirements not met</div>
           {hardFailures.map((f, i) => (
             <div key={i}>• {f.message}</div>
           ))}
@@ -117,7 +131,7 @@ export function AtsEnterpriseResults({ result, compact = false }: AtsEnterpriseR
       {result.matchedKeywords.length > 0 && (
         <div>
           <div className="text-xs font-medium text-green-700 mb-1">
-            Matched Keywords ({result.matchedKeywords.length})
+            Matched key skills ({result.matchedKeywords.length})
           </div>
           <div className="flex flex-wrap gap-1.5">
             {result.matchedKeywords.slice(0, compact ? 10 : 15).map((kw) => (
@@ -132,7 +146,7 @@ export function AtsEnterpriseResults({ result, compact = false }: AtsEnterpriseR
       {result.missingKeywords.length > 0 && (
         <div>
           <div className="text-xs font-medium text-amber-700 mb-1">
-            Missing Keywords ({result.missingKeywords.length})
+            Missing key skills ({result.missingKeywords.length})
           </div>
           <div className="flex flex-wrap gap-1.5">
             {result.missingKeywords.slice(0, compact ? 10 : 15).map((kw) => (

@@ -14,8 +14,11 @@ export default function ResumesPage() {
   const [uploadSuccess, setUploadSuccess] = useState("");
   const [analysisMap, setAnalysisMap] = useState<Record<string, AtsAnalysisResult | null>>({});
   const [jdForAnalysis, setJdForAnalysis] = useState("");
+  const [jdError, setJdError] = useState("");
+  const [analysisErrors, setAnalysisErrors] = useState<Record<string, string>>({});
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const jdRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     loadResumes();
@@ -70,28 +73,63 @@ export default function ResumesPage() {
     }
   }
 
+  async function resolveResumeText(resume: any): Promise<string> {
+    const preview = resume.textPreview || "";
+    const inline = resume.rawText || "";
+    if (inline.length > preview.length + 50) return inline;
+
+    try {
+      const full = await api.resumes.get(resume.id);
+      return full.rawText || full.textPreview || inline || preview;
+    } catch {
+      return inline || preview;
+    }
+  }
+
   async function analyzeResume(resume: any) {
+    setAnalysisErrors((prev) => {
+      const next = { ...prev };
+      delete next[resume.id];
+      return next;
+    });
+
     if (!jdForAnalysis.trim()) {
-      alert("Enter a job description first to analyze your resume.");
+      setJdError("Paste a job description above, then click Check ATS Score.");
+      jdRef.current?.focus();
+      jdRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    setJdError("");
+
     setAnalyzingId(resume.id);
     try {
-      const resumeText = resume.rawText || resume.textPreview || "";
-      if (!resumeText) {
-        alert("This resume has no text content. Re-upload with text content.");
+      const resumeText = await resolveResumeText(resume);
+      if (!resumeText.trim()) {
+        setAnalysisErrors((prev) => ({
+          ...prev,
+          [resume.id]: "No readable text found. Re-upload this resume as PDF, DOCX, or TXT.",
+        }));
         return;
       }
+
       const result = await api.ats.analyzeEnterprise(resumeText, jdForAnalysis);
       analytics.atsAnalyzed({ score: result.score || 0, has_jd: true });
       setAnalysisMap((prev) => ({
         ...prev,
         [resume.id]: result,
       }));
-      await api.resumes.update(resume.id, { lastAtsScore: result.score || 0 });
-      await loadResumes();
+
+      try {
+        await api.resumes.update(resume.id, { lastAtsScore: result.score || 0 });
+        await loadResumes();
+      } catch (saveErr) {
+        console.warn("Could not save ATS score:", saveErr);
+      }
     } catch (err: any) {
-      alert(err.message || "Analysis failed");
+      setAnalysisErrors((prev) => ({
+        ...prev,
+        [resume.id]: err.message || "ATS analysis failed. Try again.",
+      }));
     } finally {
       setAnalyzingId(null);
     }
@@ -120,14 +158,30 @@ export default function ResumesPage() {
       )}
 
       <Card className="mb-6">
-        <h2 className="text-sm font-bold text-foreground mb-3">ATS Analysis (paste a job description)</h2>
+        <h2 className="text-sm font-bold text-foreground mb-1">ATS Analysis</h2>
+        <p className="text-xs text-muted mb-3">
+          Paste a job description, then run our built-in ATS scorer against any resume below.
+        </p>
         <textarea
+          ref={jdRef}
           value={jdForAnalysis}
-          onChange={(e) => setJdForAnalysis(e.target.value)}
-          rows={3}
-          placeholder="Paste a job description here, then click 'Check ATS Score' on any resume below..."
-          className="w-full px-3 py-2 border border-border rounded-button text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-y"
+          onChange={(e) => {
+            setJdForAnalysis(e.target.value);
+            if (e.target.value.trim()) setJdError("");
+          }}
+          rows={4}
+          placeholder="Paste the full job description here (title, requirements, skills, experience)..."
+          className={`w-full px-3 py-2 border rounded-button text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-y ${
+            jdError ? "border-red-300 bg-red-50/40" : "border-border"
+          }`}
         />
+        {jdError ? (
+          <p className="mt-2 text-xs text-red-600">{jdError}</p>
+        ) : !jdForAnalysis.trim() ? (
+          <p className="mt-2 text-xs text-amber-600">A job description is required before checking ATS score.</p>
+        ) : (
+          <p className="mt-2 text-xs text-emerald-600">Ready — click Check ATS Score on a resume card.</p>
+        )}
       </Card>
 
       {resumes.length === 0 ? (
@@ -193,7 +247,7 @@ export default function ResumesPage() {
                     )}
                     <button
                       onClick={() => analyzeResume(resume)}
-                      disabled={analyzingId === resume.id || !jdForAnalysis.trim()}
+                      disabled={analyzingId === resume.id}
                       className="text-xs text-primary hover:text-primary-hover font-medium disabled:text-slate-300 disabled:cursor-not-allowed"
                     >
                       {analyzingId === resume.id ? "Analyzing..." : "Check ATS Score"}
@@ -201,6 +255,10 @@ export default function ResumesPage() {
                     <button onClick={() => handleDelete(resume.id)} className="text-xs text-slate-400 hover:text-red-500">Delete</button>
                   </div>
                 </div>
+
+                {analysisErrors[resume.id] && (
+                  <p className="mt-3 text-xs text-red-600">{analysisErrors[resume.id]}</p>
+                )}
 
                 {analysis && (
                   <div className="mt-3 pt-3 border-t border-slate-100">

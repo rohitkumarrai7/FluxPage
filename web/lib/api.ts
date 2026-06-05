@@ -48,6 +48,20 @@ function invalidateProfileCache() {
   profileCache = null;
 }
 
+async function parseApiError(res: Response, fallback: string): Promise<never> {
+  try {
+    const data = await res.json();
+    const message =
+      (typeof data.detail === "string" && data.detail) ||
+      (typeof data.error === "string" && data.error) ||
+      fallback;
+    throw new Error(message);
+  } catch (err) {
+    if (err instanceof Error && err.message !== fallback) throw err;
+    throw new Error(fallback);
+  }
+}
+
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -195,6 +209,12 @@ export const api = {
       const res = await apiFetch("/v1/resumes");
       if (!res.ok) throw new Error("Failed to fetch resumes");
       return res.json();
+    },
+    get: async (id: string) => {
+      const res = await apiFetch(`/v1/resumes/${id}`);
+      if (!res.ok) await parseApiError(res, "Failed to fetch resume");
+      const data = await res.json();
+      return data.resume;
     },
     upload: async (file: File, label?: string) => {
       const formData = new FormData();
@@ -347,15 +367,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ resumeText, jobDescription }),
       });
-      if (!res.ok) throw new Error("Analysis failed");
+      if (!res.ok) await parseApiError(res, "ATS analysis failed");
       return normalizeAtsResponse(await res.json());
     },
     analyzeEnterprise: async (resumeText: string, jobDescription: string): Promise<AtsAnalysisResult> => {
-      const res = await apiFetch("/v1/ats/analyze-enterprise", {
+      const res = await apiFetch("/v1/ats/analyze", {
         method: "POST",
         body: JSON.stringify({ resumeText, jobDescription }),
       });
-      if (!res.ok) throw new Error("Enterprise analysis failed");
+      if (!res.ok) await parseApiError(res, "ATS analysis failed");
       return normalizeAtsResponse(await res.json());
     },
   },

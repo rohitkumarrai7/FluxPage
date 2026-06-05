@@ -269,6 +269,29 @@ http.route({
 
 http.route({
   pathPrefix: "/v1/resumes/",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    if (!isResumeItemPath(request.url)) {
+      return jsonResponse(request, { detail: "Not found" }, 404);
+    }
+    try {
+      const token = extractBearer(request);
+      if (!token) return jsonResponse(request, { detail: "Unauthorized" }, 401);
+      const profile = await ctx.runQuery(api.auth.getProfile, { token });
+      const resumeId = extractPathParam(request.url, "resumes") as any;
+      const resume = await ctx.runQuery(api.resumes.getForUser, {
+        resumeId,
+        userId: profile.id as any,
+      });
+      return jsonResponse(request, { resume });
+    } catch (e: any) {
+      return jsonResponse(request, { detail: e.message }, 404);
+    }
+  }),
+});
+
+http.route({
+  pathPrefix: "/v1/resumes/",
   method: "PATCH",
   handler: httpAction(async (ctx, request) => {
     if (!isResumeItemPath(request.url)) {
@@ -814,6 +837,7 @@ for (const path of [
   "/v1/drafts/create",
   "/v1/drafts/update",
   "/v1/ats/analyze",
+  "/v1/ats/analyze-enterprise",
   "/v1/pdf/parse",
   "/v1/ai/generate",
   "/v1/templates", "/v1/templates/seed",
