@@ -1,0 +1,910 @@
+{
+  "meta": {
+    "target": "local",
+    "llmEnabled": true,
+    "skillsOnlyGamingDetected": false
+  },
+  "results": [
+    {
+      "id": "swe-senior-platform",
+      "role": "SWE senior",
+      "positive": true,
+      "score": 86,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 93,
+        "taxonomyMatch": 94,
+        "semanticSimilarity": 27,
+        "sectionCompleteness": 88,
+        "formatCompatibility": 100,
+        "impactDensity": 100,
+        "experienceRelevance": 100,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 83,
+        "keywordHeavy": 88,
+        "semanticHeavy": 71,
+        "knockoutStrict": 83
+      },
+      "resumeDomain": "engineering",
+      "jdDomain": "engineering",
+      "weakestSignal": {
+        "signal": "semanticSimilarity",
+        "value": 27
+      },
+      "llm": {
+        "count": 13,
+        "rawCount": 13,
+        "finalCount": 13,
+        "rewriteCount": 9,
+        "addCount": 4,
+        "scoreBefore": 83,
+        "scoreAfter": 86,
+        "scoreDelta": 3,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "swe-senior-staff-overqualified",
+      "role": "SWE senior",
+      "positive": false,
+      "score": 62,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 40,
+        "taxonomyMatch": 70,
+        "semanticSimilarity": 7,
+        "sectionCompleteness": 88,
+        "formatCompatibility": 100,
+        "impactDensity": 100,
+        "experienceRelevance": 100,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 64,
+        "keywordHeavy": 61,
+        "semanticHeavy": 53,
+        "knockoutStrict": 64
+      },
+      "resumeDomain": "engineering",
+      "jdDomain": "engineering",
+      "weakestSignal": {
+        "signal": "semanticSimilarity",
+        "value": 7
+      },
+      "llm": {
+        "count": 12,
+        "rawCount": 12,
+        "finalCount": 12,
+        "rewriteCount": 9,
+        "addCount": 3,
+        "scoreBefore": 64,
+        "scoreAfter": 62,
+        "scoreDelta": -2,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "swe-junior-react",
+      "role": "SWE junior",
+      "positive": true,
+      "score": 87,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 53,
+        "taxonomyMatch": 63,
+        "semanticSimilarity": 31,
+        "sectionCompleteness": 94,
+        "formatCompatibility": 100,
+        "impactDensity": 100,
+        "experienceRelevance": 65,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 67,
+        "keywordHeavy": 66,
+        "semanticHeavy": 61,
+        "knockoutStrict": 67
+      },
+      "resumeDomain": "engineering",
+      "jdDomain": "engineering",
+      "weakestSignal": {
+        "signal": "semanticSimilarity",
+        "value": 31
+      },
+      "llm": {
+        "count": 12,
+        "rawCount": 12,
+        "finalCount": 12,
+        "rewriteCount": 10,
+        "addCount": 2,
+        "scoreBefore": 67,
+        "scoreAfter": 87,
+        "scoreDelta": 20,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "swe-junior-staff-mismatch",
+      "role": "SWE junior",
+      "positive": false,
+      "score": 50,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 56,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 14,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 14
+      },
+      "resumeDomain": "engineering",
+      "jdDomain": "engineering",
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 12,
+        "rawCount": 12,
+        "finalCount": 12,
+        "rewriteCount": 12,
+        "addCount": 0,
+        "scoreBefore": 15,
+        "scoreAfter": 50,
+        "scoreDelta": 35,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "qa-naukri-selenium",
+      "role": "QA automation",
+      "positive": true,
+      "score": 80,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 69,
+        "taxonomyMatch": 75,
+        "semanticSimilarity": 33,
+        "sectionCompleteness": 88,
+        "formatCompatibility": 100,
+        "impactDensity": 50,
+        "experienceRelevance": 100,
+        "industryAlignment": 55
+      },
+      "profiles": {
+        "fluxpage": 69,
+        "keywordHeavy": 71,
+        "semanticHeavy": 62,
+        "knockoutStrict": 69
+      },
+      "resumeDomain": "engineering",
+      "jdDomain": null,
+      "weakestSignal": {
+        "signal": "semanticSimilarity",
+        "value": 33
+      },
+      "llm": {
+        "count": 13,
+        "rawCount": 13,
+        "finalCount": 13,
+        "rewriteCount": 13,
+        "addCount": 0,
+        "scoreBefore": 69,
+        "scoreAfter": 80,
+        "scoreDelta": 11,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "qa-chef-wrong-domain",
+      "role": "QA automation",
+      "positive": false,
+      "score": 79,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 55
+      },
+      "profiles": {
+        "fluxpage": 12,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 12
+      },
+      "resumeDomain": "culinary",
+      "jdDomain": null,
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 12,
+        "rawCount": 12,
+        "finalCount": 12,
+        "rewriteCount": 9,
+        "addCount": 3,
+        "scoreBefore": 15,
+        "scoreAfter": 79,
+        "scoreDelta": 64,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "devops-k8s-match",
+      "role": "DevOps",
+      "positive": true,
+      "score": 83,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 93,
+        "taxonomyMatch": 84,
+        "semanticSimilarity": 53,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 100,
+        "impactDensity": 67,
+        "experienceRelevance": 100,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 81,
+        "keywordHeavy": 83,
+        "semanticHeavy": 73,
+        "knockoutStrict": 81
+      },
+      "resumeDomain": "infrastructure",
+      "jdDomain": "infrastructure",
+      "weakestSignal": {
+        "signal": "semanticSimilarity",
+        "value": 53
+      },
+      "llm": {
+        "count": 14,
+        "rawCount": 14,
+        "finalCount": 14,
+        "rewriteCount": 12,
+        "addCount": 2,
+        "scoreBefore": 80,
+        "scoreAfter": 83,
+        "scoreDelta": 3,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "devops-frontend-only-jd",
+      "role": "DevOps",
+      "positive": false,
+      "score": 70,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 22
+      },
+      "profiles": {
+        "fluxpage": 10,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 10
+      },
+      "resumeDomain": "infrastructure",
+      "jdDomain": "design",
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 12,
+        "rawCount": 12,
+        "finalCount": 12,
+        "rewriteCount": 10,
+        "addCount": 2,
+        "scoreBefore": 15,
+        "scoreAfter": 70,
+        "scoreDelta": 55,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "data-analyst-bi",
+      "role": "Data analyst",
+      "positive": true,
+      "score": 80,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 80,
+        "taxonomyMatch": 100,
+        "semanticSimilarity": 44,
+        "sectionCompleteness": 75,
+        "formatCompatibility": 100,
+        "impactDensity": 50,
+        "experienceRelevance": 100,
+        "industryAlignment": 55
+      },
+      "profiles": {
+        "fluxpage": 76,
+        "keywordHeavy": 79,
+        "semanticHeavy": 70,
+        "knockoutStrict": 76
+      },
+      "resumeDomain": "analytics",
+      "jdDomain": null,
+      "weakestSignal": {
+        "signal": "semanticSimilarity",
+        "value": 44
+      },
+      "llm": {
+        "count": 12,
+        "rawCount": 12,
+        "finalCount": 12,
+        "rewriteCount": 10,
+        "addCount": 2,
+        "scoreBefore": 76,
+        "scoreAfter": 80,
+        "scoreDelta": 4,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "data-analyst-ml-gap",
+      "role": "Data analyst",
+      "positive": false,
+      "score": 78,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 55
+      },
+      "profiles": {
+        "fluxpage": 12,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 12
+      },
+      "resumeDomain": "analytics",
+      "jdDomain": null,
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 11,
+        "rawCount": 11,
+        "finalCount": 11,
+        "rewriteCount": 8,
+        "addCount": 3,
+        "scoreBefore": 15,
+        "scoreAfter": 78,
+        "scoreDelta": 63,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "rn-icu-match",
+      "role": "Healthcare RN",
+      "positive": true,
+      "score": 53,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 50,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 49,
+        "sectionCompleteness": 81,
+        "formatCompatibility": 100,
+        "impactDensity": 33,
+        "experienceRelevance": 50,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 51,
+        "keywordHeavy": 49,
+        "semanticHeavy": 49,
+        "knockoutStrict": 51
+      },
+      "resumeDomain": "healthcare",
+      "jdDomain": "healthcare",
+      "weakestSignal": {
+        "signal": "taxonomyMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 11,
+        "rawCount": 11,
+        "finalCount": 11,
+        "rewriteCount": 11,
+        "addCount": 0,
+        "scoreBefore": 51,
+        "scoreAfter": 53,
+        "scoreDelta": 2,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "rn-swe-knockout",
+      "role": "Healthcare RN",
+      "positive": false,
+      "score": 75,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 22
+      },
+      "profiles": {
+        "fluxpage": 10,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 10
+      },
+      "resumeDomain": "healthcare",
+      "jdDomain": "engineering",
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 11,
+        "rawCount": 11,
+        "finalCount": 11,
+        "rewriteCount": 11,
+        "addCount": 0,
+        "scoreBefore": 15,
+        "scoreAfter": 75,
+        "scoreDelta": 60,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "lawyer-litigation",
+      "role": "Corporate lawyer",
+      "positive": true,
+      "score": 58,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 50,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 71,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 100,
+        "impactDensity": 50,
+        "experienceRelevance": 50,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 55,
+        "keywordHeavy": 51,
+        "semanticHeavy": 56,
+        "knockoutStrict": 55
+      },
+      "resumeDomain": "legal",
+      "jdDomain": "legal",
+      "weakestSignal": {
+        "signal": "taxonomyMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 10,
+        "rawCount": 10,
+        "finalCount": 10,
+        "rewriteCount": 7,
+        "addCount": 3,
+        "scoreBefore": 55,
+        "scoreAfter": 58,
+        "scoreDelta": 3,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "lawyer-marketing-mismatch",
+      "role": "Corporate lawyer",
+      "positive": false,
+      "score": 78,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 22
+      },
+      "profiles": {
+        "fluxpage": 10,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 10
+      },
+      "resumeDomain": "legal",
+      "jdDomain": "marketing",
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 10,
+        "rawCount": 10,
+        "finalCount": 10,
+        "rewriteCount": 9,
+        "addCount": 1,
+        "scoreBefore": 15,
+        "scoreAfter": 78,
+        "scoreDelta": 63,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "marketing-intern-messy-jd",
+      "role": "Marketing intern",
+      "positive": true,
+      "score": 44,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 50,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 4,
+        "sectionCompleteness": 88,
+        "formatCompatibility": 100,
+        "impactDensity": 0,
+        "experienceRelevance": 50,
+        "industryAlignment": 22
+      },
+      "profiles": {
+        "fluxpage": 37,
+        "keywordHeavy": 42,
+        "semanticHeavy": 30,
+        "knockoutStrict": 37
+      },
+      "resumeDomain": "finance",
+      "jdDomain": "marketing",
+      "weakestSignal": {
+        "signal": "taxonomyMatch",
+        "value": 0
+      },
+      "llm": {
+        "count": 11,
+        "rawCount": 11,
+        "finalCount": 11,
+        "rewriteCount": 9,
+        "addCount": 2,
+        "scoreBefore": 37,
+        "scoreAfter": 44,
+        "scoreDelta": 7,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "marketing-intern-clean",
+      "role": "Marketing intern",
+      "positive": true,
+      "score": 75,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 59,
+        "taxonomyMatch": 80,
+        "semanticSimilarity": 32,
+        "sectionCompleteness": 75,
+        "formatCompatibility": 100,
+        "impactDensity": 0,
+        "experienceRelevance": 65,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 60,
+        "keywordHeavy": 60,
+        "semanticHeavy": 53,
+        "knockoutStrict": 60
+      },
+      "resumeDomain": "marketing",
+      "jdDomain": "marketing",
+      "weakestSignal": {
+        "signal": "impactDensity",
+        "value": 0
+      },
+      "llm": {
+        "count": 12,
+        "rawCount": 12,
+        "finalCount": 12,
+        "rewriteCount": 9,
+        "addCount": 3,
+        "scoreBefore": 60,
+        "scoreAfter": 75,
+        "scoreDelta": 15,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "ux-product-design",
+      "role": "UX designer",
+      "positive": true,
+      "score": 84,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 50,
+        "taxonomyMatch": 50,
+        "semanticSimilarity": 61,
+        "sectionCompleteness": 75,
+        "formatCompatibility": 100,
+        "impactDensity": 50,
+        "experienceRelevance": 100,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 66,
+        "keywordHeavy": 61,
+        "semanticHeavy": 64,
+        "knockoutStrict": 66
+      },
+      "resumeDomain": "design",
+      "jdDomain": "design",
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 50
+      },
+      "llm": {
+        "count": 13,
+        "rawCount": 13,
+        "finalCount": 13,
+        "rewriteCount": 11,
+        "addCount": 2,
+        "scoreBefore": 66,
+        "scoreAfter": 84,
+        "scoreDelta": 18,
+        "model": "openai/gpt-5.4-mini",
+        "jdSource": "llm"
+      },
+      "issues": [],
+      "passed": true
+    },
+    {
+      "id": "ux-backend-mismatch",
+      "role": "UX designer",
+      "positive": false,
+      "score": 15,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 72
+      },
+      "profiles": {
+        "fluxpage": 13,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 13
+      },
+      "resumeDomain": "design",
+      "jdDomain": "engineering",
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": null,
+      "issues": [
+        "LLM path failed: fetch failed"
+      ],
+      "passed": false
+    },
+    {
+      "id": "hr-ta-match",
+      "role": "HR recruiter",
+      "positive": true,
+      "score": 45,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 50,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 42,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 100,
+        "impactDensity": 0,
+        "experienceRelevance": 50,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 45,
+        "keywordHeavy": 43,
+        "semanticHeavy": 41,
+        "knockoutStrict": 45
+      },
+      "resumeDomain": "hr",
+      "jdDomain": "hr",
+      "weakestSignal": {
+        "signal": "taxonomyMatch",
+        "value": 0
+      },
+      "llm": null,
+      "issues": [
+        "LLM path failed: fetch failed"
+      ],
+      "passed": false
+    },
+    {
+      "id": "hr-engineering-jd",
+      "role": "HR recruiter",
+      "positive": false,
+      "score": 15,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 0,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 0,
+        "industryAlignment": 22
+      },
+      "profiles": {
+        "fluxpage": 10,
+        "keywordHeavy": 9,
+        "semanticHeavy": 9,
+        "knockoutStrict": 10
+      },
+      "resumeDomain": "hr",
+      "jdDomain": "engineering",
+      "weakestSignal": {
+        "signal": "keywordMatch",
+        "value": 0
+      },
+      "llm": null,
+      "issues": [
+        "LLM path failed: fetch failed"
+      ],
+      "passed": false
+    },
+    {
+      "id": "finance-equity-research",
+      "role": "Finance analyst",
+      "positive": true,
+      "score": 49,
+      "passedKnockouts": true,
+      "breakdown": {
+        "keywordMatch": 50,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 68,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 100,
+        "impactDensity": 0,
+        "experienceRelevance": 50,
+        "industryAlignment": 100
+      },
+      "profiles": {
+        "fluxpage": 50,
+        "keywordHeavy": 46,
+        "semanticHeavy": 50,
+        "knockoutStrict": 50
+      },
+      "resumeDomain": "finance",
+      "jdDomain": "finance",
+      "weakestSignal": {
+        "signal": "taxonomyMatch",
+        "value": 0
+      },
+      "llm": null,
+      "issues": [
+        "LLM path failed: fetch failed"
+      ],
+      "passed": false
+    },
+    {
+      "id": "finance-chef-negative",
+      "role": "Finance analyst",
+      "positive": false,
+      "score": 15,
+      "passedKnockouts": false,
+      "breakdown": {
+        "keywordMatch": 50,
+        "taxonomyMatch": 0,
+        "semanticSimilarity": 0,
+        "sectionCompleteness": 63,
+        "formatCompatibility": 30,
+        "impactDensity": 0,
+        "experienceRelevance": 50,
+        "industryAlignment": 22
+      },
+      "profiles": {
+        "fluxpage": 26,
+        "keywordHeavy": 32,
+        "semanticHeavy": 19,
+        "knockoutStrict": 26
+      },
+      "resumeDomain": "finance",
+      "jdDomain": "culinary",
+      "weakestSignal": {
+        "signal": "taxonomyMatch",
+        "value": 0
+      },
+      "llm": null,
+      "issues": [
+        "LLM path failed: fetch failed"
+      ],
+      "passed": false
+    }
+  ]
+}

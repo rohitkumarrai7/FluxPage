@@ -125,6 +125,9 @@ export function AtsEnterpriseResults({ result, compact = false }: AtsEnterpriseR
           {result.breakdown.experienceRelevance != null && (
             <BreakdownBar label="Experience relevance" value={result.breakdown.experienceRelevance} />
           )}
+          {result.breakdown.industryAlignment != null && (
+            <BreakdownBar label="Industry fit" value={result.breakdown.industryAlignment} />
+          )}
         </div>
       )}
 

@@ -1,16 +1,20 @@
 "use client";
 
+import type { AtsBreakdown } from "@/lib/atsNormalize";
+import type { JDAnalysis } from "@/lib/jdAnalyzer";
+
 interface Props {
   jobTitle: string;
   company: string;
   source?: string;
   matchedKeywords: string[];
   missingKeywords: string[];
-  totalJDKeywords: number;
   score: number | null;
   initialScore: number | null;
   appliedCount: number;
   totalSuggestions: number;
+  breakdown?: AtsBreakdown | null;
+  jdInsights?: JDAnalysis | null;
   onTailorResume?: () => void;
   isGenerating?: boolean;
 }
@@ -49,25 +53,47 @@ function KeywordGauge({ matched, total }: { matched: number; total: number }) {
   );
 }
 
+function BreakdownBar({ label, value }: { label: string; value: number }) {
+  const color = value >= 75 ? "bg-emerald-500" : value >= 50 ? "bg-amber-500" : "bg-red-500";
+  return (
+    <div>
+      <div className="flex justify-between text-[10px] mb-0.5">
+        <span className="text-slate-400 capitalize">{label.replace(/([A-Z])/g, " $1").trim()}</span>
+        <span className="text-slate-300 font-medium">{value}%</span>
+      </div>
+      <div className="h-1 bg-slate-700/50 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, value)}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function JobSidebar({
   jobTitle,
   company,
   source,
   matchedKeywords,
   missingKeywords,
-  totalJDKeywords,
   score,
   initialScore,
   appliedCount,
   totalSuggestions,
+  breakdown,
+  jdInsights,
   onTailorResume,
   isGenerating,
 }: Props) {
   const improvement = initialScore != null && score != null ? score - initialScore : null;
+  const totalKw = matchedKeywords.length + missingKeywords.length;
+
+  const weakest = breakdown
+    ? Object.entries(breakdown)
+        .filter(([, v]) => typeof v === "number")
+        .sort((a, b) => (a[1] as number) - (b[1] as number))[0]
+    : null;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Job info */}
       <div className="p-4 border-b border-[var(--focus-border)]">
         <h2 className="text-sm font-bold text-slate-100 leading-tight">{jobTitle || "Job Details"}</h2>
         {company && <div className="text-xs text-slate-400 mt-0.5">{company}</div>}
@@ -76,7 +102,45 @@ export function JobSidebar({
         )}
       </div>
 
-      {/* Score section */}
+      {jdInsights && (
+        <div className="p-4 border-b border-[var(--focus-border)]">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] text-slate-400 uppercase tracking-wider">Job Insights</div>
+            <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${
+              jdInsights.source === "llm" ? "bg-violet-500/20 text-violet-300" : "bg-amber-500/20 text-amber-300"
+            }`}>
+              {jdInsights.source === "llm" ? "AI" : "regex"}
+            </span>
+          </div>
+          {jdInsights.roleLevel && (
+            <div className="text-[10px] text-slate-400 mb-1">Level: <span className="text-slate-300">{jdInsights.roleLevel}</span></div>
+          )}
+          {jdInsights.industry && (
+            <div className="text-[10px] text-slate-400 mb-2">Industry: <span className="text-slate-300">{jdInsights.industry}</span></div>
+          )}
+          {jdInsights.hardSkills.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[9px] text-slate-500 mb-1">Hard skills</div>
+              <div className="flex flex-wrap gap-1">
+                {jdInsights.hardSkills.slice(0, 8).map((s) => (
+                  <span key={s} className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">{s}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {jdInsights.tools.length > 0 && (
+            <div>
+              <div className="text-[9px] text-slate-500 mb-1">Tools</div>
+              <div className="flex flex-wrap gap-1">
+                {jdInsights.tools.slice(0, 6).map((t) => (
+                  <span key={t} className="text-[8px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="p-4 border-b border-[var(--focus-border)]">
         <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">ATS Match Score</div>
         <div className="flex items-end gap-2">
@@ -96,12 +160,31 @@ export function JobSidebar({
         )}
       </div>
 
-      {/* Keyword gauge */}
+      {breakdown && (
+        <div className="p-4 border-b border-[var(--focus-border)] space-y-2">
+          <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Score Breakdown</div>
+          <BreakdownBar label="keywordMatch" value={breakdown.keywordMatch} />
+          {breakdown.taxonomyMatch != null && <BreakdownBar label="taxonomyMatch" value={breakdown.taxonomyMatch} />}
+          <BreakdownBar label="semanticSimilarity" value={breakdown.semanticSimilarity} />
+          <BreakdownBar label="impactDensity" value={breakdown.impactDensity} />
+          {breakdown.experienceRelevance != null && (
+            <BreakdownBar label="experienceRelevance" value={breakdown.experienceRelevance} />
+          )}
+          {breakdown.industryAlignment != null && (
+            <BreakdownBar label="industryAlignment" value={breakdown.industryAlignment} />
+          )}
+          {weakest && (weakest[1] as number) < 50 && (
+            <p className="text-[9px] text-amber-400/90 mt-1">
+              Improve {weakest[0].replace(/([A-Z])/g, " $1").trim()} to raise your score
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="p-4 border-b border-[var(--focus-border)]">
-        <KeywordGauge matched={matchedKeywords.length} total={totalJDKeywords} />
+        <KeywordGauge matched={matchedKeywords.length} total={totalKw || 1} />
       </div>
 
-      {/* Skills tags */}
       {matchedKeywords.length > 0 && (
         <div className="p-4 border-b border-[var(--focus-border)]">
           <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">Skills Found</div>
@@ -115,7 +198,6 @@ export function JobSidebar({
         </div>
       )}
 
-      {/* Missing keywords */}
       {missingKeywords.length > 0 && (
         <div className="p-4 border-b border-[var(--focus-border)]">
           <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">Missing Keywords</div>
@@ -129,7 +211,6 @@ export function JobSidebar({
         </div>
       )}
 
-      {/* Action buttons */}
       <div className="p-4 space-y-2 mt-auto">
         {onTailorResume && (
           <button

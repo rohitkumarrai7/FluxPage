@@ -21,7 +21,9 @@ import { Spinner, SpinnerCenter } from "@/components/ui";
 import { AnimatedScore } from "@/components/ui/AnimatedScore";
 import { InlineDiffResume } from "@/components/tailor/InlineDiffResume";
 import { JobSidebar } from "@/components/tailor/JobSidebar";
-import { boostUntilTargetScore, extractJDKeywordsSync, countKeywordMatches } from "@/lib/atsBoost";
+import { SuggestionChecklist } from "@/components/tailor/SuggestionChecklist";
+import type { AtsBreakdown } from "@/lib/atsNormalize";
+import type { JDAnalysis } from "@/lib/jdAnalyzer";
 import { analytics } from "@/lib/analytics";
 import { useFluxFlag } from "@/hooks/useFeatureFlag";
 
@@ -64,8 +66,10 @@ function TailorContent() {
   const [filename, setFilename] = useState("tailored-resume");
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
-  const [jdKeywords, setJdKeywords] = useState<string[]>([]);
-  const [isBoosting, setIsBoosting] = useState(false);
+  const [atsBreakdown, setAtsBreakdown] = useState<AtsBreakdown | null>(null);
+  const [jdInsights, setJdInsights] = useState<JDAnalysis | null>(null);
+  const [lastScoreDelta, setLastScoreDelta] = useState<number | null>(null);
+  const jdAnalysisCacheRef = useRef<JDAnalysis | null>(null);
   const [docxExportEnabled, setDocxExportEnabled] = useState(false);
   const newTailorWizard = useFluxFlag("new-tailor-wizard");
 
@@ -79,6 +83,7 @@ function TailorContent() {
       setScore(result.score || 0);
       setMatchedKeywords(result.matchedKeywords || []);
       setMissingKeywords(result.missingKeywords || []);
+      if (result.breakdown) setAtsBreakdown(result.breakdown);
       return {
         score: result.score || 0,
         matchedKeywords: result.matchedKeywords || [],
@@ -147,15 +152,21 @@ function TailorContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           resumeText: structuredResumeToText(structuredResume),
+          structuredResume,
           jobDescription: jd,
           jobTitle: draftData?.context?.job?.title || draftData?.jobTitle || "",
           company: draftData?.context?.job?.company || draftData?.company || "",
           missingKeywords: gapMissing,
           matchedKeywords: gapMatched,
           intensity: intensityOverride || intensity,
+          cachedJdAnalysis: jdAnalysisCacheRef.current,
         }),
       });
       const data = await res.json();
+      if (data.jdAnalysis) {
+        jdAnalysisCacheRef.current = data.jdAnalysis;
+        setJdInsights(data.jdAnalysis);
+      }
       if (data.suggestions && data.suggestions.length > 0) {
         const mapped: TailorSuggestion[] = data.suggestions.map((s: any) => {
           const section = structuredResume.sections.find(
@@ -220,10 +231,6 @@ function TailorContent() {
           data.context?.jobDescription ||
           "";
         setJobDescription(jd);
-        const jobTitleForKw =
-          data.context?.job?.title || data.jobTitle || "";
-        setJdKeywords(extractJDKeywordsSync(jd, jobTitleForKw));
-
         const rawText =
           data.context?.analysis?.gapAnalysis?.resumeOriginalText ||
           data.resumeOriginalText ||
@@ -238,20 +245,21 @@ function TailorContent() {
           try { nerConverted = nerToStructuredResume(data.context.resume.structuredData); } catch {}
         }
 
-        // LLM parse (always try for quality)
-        let llmParsed: StructuredResume | null = null;
-        if (rawText && rawText.length > 50) {
-          llmParsed = await llmParseResume(rawText);
-        }
+        const llmPromise =
+          rawText && rawText.length > 50 ? llmParseResume(rawText) : Promise.resolve(null);
 
-        // Pick best parse by quality score
-        let structured = pickBestParse(llmParsed, nerConverted, regexParsed, cachedStructured);
+        let structured = pickBestParse(nerConverted, regexParsed, cachedStructured);
+        const llmParsed = await llmPromise;
+        structured = pickBestParse(llmParsed, structured);
         if (!structured && cachedStructured) structured = cachedStructured;
 
         setResume(structured);
         setOriginalResume(structured ? JSON.parse(JSON.stringify(structured)) : null);
 
-        // Always generate LLM suggestions — ignore cached aiSuggestions
+        if (structured && jd) {
+          rescoreFull(structured).catch(() => {});
+        }
+
         if (structured && jd) {
           const llmSugg = await generateLLMSuggestions(
             structured, jd, data, gapMissing, gapMatched
@@ -301,6 +309,7 @@ function TailorContent() {
     const suggestion = suggestions.find((s) => s.id === id);
     if (!suggestion || suggestion.applied) return;
 
+    const scoreBefore = score ?? initialScore ?? 0;
     snapshotsRef.current.set(id, JSON.parse(JSON.stringify(resume)));
     const nextResume = applySuggestionToResume(resume, suggestion);
     setResume(nextResume);
@@ -309,9 +318,11 @@ function TailorContent() {
     );
     setSuggestions(nextSuggestions);
     analytics.tailorSuggestionApplied({ count: 1, type: suggestion.type });
-    rescore(nextResume).then((newScore) =>
-      persistState(nextResume, nextSuggestions, newScore)
-    );
+    rescore(nextResume).then((newScore) => {
+      const delta = newScore - scoreBefore;
+      if (delta > 0) setLastScoreDelta(delta);
+      persistState(nextResume, nextSuggestions, newScore);
+    });
   }
 
   function rejectSuggestion(id: string) {
@@ -335,6 +346,7 @@ function TailorContent() {
   async function applyAll() {
     if (!resume || !jobDescription) return;
     snapshotsRef.current.set("__all__", JSON.parse(JSON.stringify(resume)));
+    const scoreBefore = score ?? initialScore ?? 0;
     let nextResume = resume;
     const nextSuggestions = suggestions.map((s) => {
       if (s.applied) return s;
@@ -345,26 +357,11 @@ function TailorContent() {
     setResume(nextResume);
     setSuggestions(nextSuggestions);
 
-    setIsBoosting(true);
-    const scoreBefore = score ?? initialScore ?? 0;
-    try {
-      const boosted = await boostUntilTargetScore(
-        nextResume,
-        jobDescription,
-        jobTitle,
-        rescoreFull,
-        { targetScore: 82, maxIterations: 2 }
-      );
-      setResume(boosted.resume);
-      setScore(boosted.score);
-      setMatchedKeywords(boosted.matchedKeywords);
-      setMissingKeywords(boosted.missingKeywords);
-      analytics.tailorSuggestionApplied({ count: nextSuggestions.filter((s) => s.applied).length, type: "bulk" });
-      analytics.tailorBoostCompleted({ score_before: scoreBefore, score_after: boosted.score });
-      await persistState(boosted.resume, nextSuggestions, boosted.score);
-    } finally {
-      setIsBoosting(false);
-    }
+    const rescored = await rescoreFull(nextResume);
+    const delta = rescored.score - scoreBefore;
+    if (delta > 0) setLastScoreDelta(delta);
+    analytics.tailorSuggestionApplied({ count: nextSuggestions.filter((s) => s.applied).length, type: "bulk" });
+    await persistState(nextResume, nextSuggestions, rescored.score);
   }
 
   function resetAll() {
@@ -434,15 +431,6 @@ function TailorContent() {
   }
 
   const appliedCount = suggestions.filter((s) => s.applied).length;
-  const resumeTextForKw = resume ? structuredResumeToText(resume) : "";
-  const kwFromJd = jdKeywords.length > 0
-    ? countKeywordMatches(resumeTextForKw, jdKeywords)
-    : null;
-  const sidebarMatched = kwFromJd?.matched ?? matchedKeywords;
-  const sidebarMissing = kwFromJd?.missing ?? missingKeywords;
-  const totalJDKeywords = jdKeywords.length > 0
-    ? jdKeywords.length
-    : matchedKeywords.length + missingKeywords.length;
   const jobTitle = draft?.context?.job?.title || draft?.jobTitle || "";
   const company = draft?.context?.job?.company || draft?.company || "";
   const source = draft?.context?.job?.source || "";
@@ -533,7 +521,17 @@ function TailorContent() {
 
       {/* Step 1: Tailor (LetMeApply layout) */}
       {step === "tailor" && (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative pb-14">
+          {/* Left: Suggestion checklist (LetMeApply style) */}
+          <div className="w-72 border-r border-[var(--focus-border)] bg-[var(--focus-panel)] flex-shrink-0 overflow-hidden hidden lg:flex lg:flex-col">
+            <SuggestionChecklist
+              suggestions={suggestions}
+              onAccept={acceptSuggestion}
+              onReject={rejectSuggestion}
+              lastScoreDelta={lastScoreDelta}
+            />
+          </div>
+
           {/* Center: Resume with inline diffs */}
           <div className="flex-1 overflow-auto bg-gray-100 dark:bg-slate-900/50">
             <div className="max-w-[680px] mx-auto py-6 px-4 relative">
@@ -573,28 +571,29 @@ function TailorContent() {
               jobTitle={jobTitle}
               company={company}
               source={source}
-              matchedKeywords={sidebarMatched}
-              missingKeywords={sidebarMissing}
-              totalJDKeywords={totalJDKeywords}
+              matchedKeywords={matchedKeywords}
+              missingKeywords={missingKeywords}
               score={score}
               initialScore={initialScore}
               appliedCount={appliedCount}
               totalSuggestions={suggestions.length}
+              breakdown={atsBreakdown}
+              jdInsights={jdInsights}
               onTailorResume={() => regenerateSuggestions()}
               isGenerating={isGeneratingSugg}
             />
           </div>
 
           {/* Sticky bottom bar (LetMeApply style) */}
-          <div className="absolute bottom-0 left-0 right-80 h-14 bg-white dark:bg-[var(--focus-panel)] border-t border-slate-200 dark:border-[var(--focus-border)] flex items-center justify-between px-6 shadow-lg z-20">
+          <div className="absolute bottom-0 left-0 right-0 lg:left-72 lg:right-80 h-14 bg-white dark:bg-[var(--focus-panel)] border-t border-slate-200 dark:border-[var(--focus-border)] flex items-center justify-between px-6 shadow-lg z-20">
             <div className="flex items-center gap-3">
               <button
                 onClick={applyAll}
-                disabled={appliedCount === suggestions.length || isBoosting}
+                disabled={appliedCount === suggestions.length || suggestions.length === 0}
                 className="flex items-center gap-2 px-5 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600 disabled:opacity-40 transition-colors shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                {isBoosting ? "Optimizing for 80+..." : "Accept All Changes"}
+                Accept All Suggestions
               </button>
               <button
                 onClick={resetAll}
@@ -681,11 +680,12 @@ function TailorContent() {
               source={source}
               matchedKeywords={matchedKeywords}
               missingKeywords={missingKeywords}
-              totalJDKeywords={totalJDKeywords}
               score={score}
               initialScore={initialScore}
               appliedCount={appliedCount}
               totalSuggestions={suggestions.length}
+              breakdown={atsBreakdown}
+              jdInsights={jdInsights}
               onTailorResume={() => regenerateSuggestions()}
               isGenerating={isGeneratingSugg}
             />
