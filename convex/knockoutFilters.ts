@@ -3,7 +3,7 @@
 // If a candidate fails a knockout, they are auto-rejected regardless of score.
 
 import type { StructuredResumeNER, StructuredJD, ParsedEducation } from "./nerParser";
-import { expandSkillAliases, inferDominantDomain, resolveSkill, areSkillsRelated, normalizeSkillList } from "./skillsTaxonomy";
+import { expandSkillAliases, inferDominantDomain, resolveSkill, areSkillsRelated, normalizeSkillList, resumeSkillSatisfies } from "./skillsTaxonomy";
 
 export interface KnockoutResult {
   passed: boolean;
@@ -43,6 +43,7 @@ function checkExperienceYears(
   jd: StructuredJD
 ): KnockoutFailure | null {
   if (jd.minYearsExperience === null) return null;
+  if (isInternshipRole(jd) && jd.minYearsExperience <= 1) return null;
 
   const candidateYears = resume.totalExperienceYears;
   const requiredYears = jd.minYearsExperience;
@@ -111,17 +112,34 @@ function resumeHasSkill(
     if (re.test(expandedResumeText)) return true;
   }
 
-  // Related skill match (PostgreSQL ≈ MongoDB, Node ≈ Express)
+  // Parent/child and related skill match (React → JavaScript, Tailwind → CSS)
+  for (const rSkill of resume.skills.map((s) => s.skill)) {
+    if (resumeSkillSatisfies(skill, rSkill)) return true;
+  }
   for (const rSkill of resumeSkillsLower) {
     const { related, similarity } = areSkillsRelated(skill, rSkill);
-    if (related && similarity >= 0.5) return true;
-  }
-  for (const rSkill of resume.skills.map((s) => s.skill)) {
-    const { related, similarity } = areSkillsRelated(skill, rSkill);
-    if (related && similarity >= 0.5) return true;
+    if (related && similarity >= 0.3) return true;
   }
 
   return false;
+}
+
+function getResolvableCriticalSkills(jd: StructuredJD): string[] {
+  const seen = new Set<string>();
+  const skills: string[] = [];
+  for (const skill of jd.requiredSkills) {
+    if (!resolveSkill(skill)) continue;
+    const key = skill.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    skills.push(skill);
+    if (skills.length >= 8) break;
+  }
+  return skills;
+}
+
+function isInternshipRole(jd: StructuredJD): boolean {
+  return jd.employmentType === "internship" || /\bintern(?:ship)?\b/i.test(jd.title);
 }
 
 function checkCriticalSkills(
@@ -139,8 +157,9 @@ function checkCriticalSkills(
   ].join(" ");
   const expandedResumeText = expandSkillAliases(allResumeText).toLowerCase();
 
-  // Only check the top 5 required skills as potential knockouts
-  const criticalSkills = jd.requiredSkills.slice(0, 5);
+  const criticalSkills = getResolvableCriticalSkills(jd);
+  if (criticalSkills.length === 0) return [];
+
   let missingCount = 0;
 
   for (const skill of criticalSkills) {
@@ -151,13 +170,17 @@ function checkCriticalSkills(
         required: skill,
         actual: "not found",
         severity: "soft",
-        message: `Critical required skill "${skill}" not found in resume`,
+        message: `Required skill "${skill}" not found in resume`,
       });
     }
   }
 
-  // Escalate to hard only when majority of critical skills are absent
-  if (missingCount >= 4) {
+  const internRole = isInternshipRole(jd);
+  const hardThreshold = internRole
+    ? Math.max(4, Math.ceil(criticalSkills.length * 0.75))
+    : Math.max(3, Math.ceil(criticalSkills.length * 0.6));
+
+  if (missingCount >= hardThreshold) {
     for (const f of failures) {
       if (f.type === "critical_skill_missing") f.severity = "hard";
     }
@@ -285,9 +308,10 @@ export function applyKnockoutFilters(
   // Check critical skills
   const skillResults = checkCriticalSkills(resume, jd);
   failedFilters.push(...skillResults);
-  const criticalSkillsPassed = jd.requiredSkills.slice(0, 5).length - skillResults.length;
-  if (criticalSkillsPassed > 0) {
-    passedFilters.push(`Critical skills: ${criticalSkillsPassed}/${Math.min(5, jd.requiredSkills.length)} present`);
+  const criticalPool = getResolvableCriticalSkills(jd);
+  const criticalSkillsPassed = criticalPool.length - skillResults.length;
+  if (criticalPool.length > 0 && criticalSkillsPassed > 0) {
+    passedFilters.push(`Key skills: ${criticalSkillsPassed}/${criticalPool.length} present`);
   }
 
   // Domain mismatch (chef vs SWE, nurse vs finance, etc.)

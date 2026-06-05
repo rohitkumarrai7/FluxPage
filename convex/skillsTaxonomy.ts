@@ -41,6 +41,7 @@ const TAXONOMY: SkillNode[] = [
   { id: "html", name: "HTML", aliases: ["html5"], parent: "frontend_fundamentals", domain: "engineering", category: "frontend", weight: 0.5 },
   { id: "css", name: "CSS", aliases: ["css3", "scss", "sass", "less", "stylesheets"], parent: "frontend_fundamentals", domain: "engineering", category: "frontend", weight: 0.5 },
   { id: "tailwind", name: "Tailwind CSS", aliases: ["tailwindcss", "tailwind"], parent: "frontend_styling", domain: "engineering", category: "frontend", weight: 0.5 },
+  { id: "bootstrap", name: "Bootstrap", aliases: ["bootstrap css", "bootstrap 5"], parent: "frontend_styling", domain: "engineering", category: "frontend", weight: 0.4 },
   { id: "react_native", name: "React Native", aliases: ["react-native", "rn"], parent: "mobile_frameworks", domain: "engineering", category: "mobile", weight: 0.8 },
   { id: "flutter", name: "Flutter", aliases: ["dart", "flutter sdk"], parent: "mobile_frameworks", domain: "engineering", category: "mobile", weight: 0.7 },
 
@@ -216,6 +217,39 @@ export function getSkillCategory(skillId: string): string | null {
 export function getSkillDomain(skillId: string): string | null {
   const skill = SKILL_BY_ID.get(skillId);
   return skill?.domain || null;
+}
+
+/** Resume skills that imply coverage of a JD requirement (React → JavaScript, etc.). */
+const SKILL_IMPLIES: Record<string, string[]> = {
+  react: ["javascript"],
+  nextjs: ["javascript", "react"],
+  vue: ["javascript"],
+  angular: ["javascript", "typescript"],
+  tailwind: ["css"],
+  bootstrap: ["css"],
+  sass: ["css"],
+  nodejs: ["javascript"],
+  express: ["javascript", "nodejs"],
+  spring: ["java"],
+  rails: ["ruby"],
+  django: ["python"],
+  flask: ["python"],
+  fastapi: ["python"],
+};
+
+export function resumeSkillSatisfies(requiredSkill: string, resumeSkill: string): boolean {
+  const req = resolveSkill(requiredSkill);
+  const res = resolveSkill(resumeSkill);
+  if (!req || !res) return false;
+  if (req.id === res.id) return true;
+
+  const { related, similarity } = areSkillsRelated(requiredSkill, resumeSkill);
+  if (related && similarity >= 0.3) return true;
+
+  const impliedByResume = SKILL_IMPLIES[res.id];
+  if (impliedByResume?.includes(req.id)) return true;
+
+  return false;
 }
 
 export function areSkillsRelated(skillA: string, skillB: string): { related: boolean; similarity: number; reason: string } {

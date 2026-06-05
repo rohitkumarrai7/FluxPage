@@ -8,7 +8,7 @@
 // This replaces simple keyword matching with a multi-signal pipeline.
 
 import { parseResumeNER, parseJobDescription, type StructuredResumeNER, type StructuredJD } from "./nerParser";
-import { computeTaxonomyMatchScore, resolveSkill, expandSkillAliases, areSkillsRelated } from "./skillsTaxonomy";
+import { computeTaxonomyMatchScore, resolveSkill, expandSkillAliases, areSkillsRelated, resumeSkillSatisfies } from "./skillsTaxonomy";
 import { computeSemanticSimilarity } from "./semanticEngine";
 import { applyKnockoutFilters, type KnockoutResult } from "./knockoutFilters";
 
@@ -134,23 +134,51 @@ function computeFormatScore(resumeText: string): number {
   return Math.max(0.2, Math.min(1.0, score));
 }
 
-function computeExperienceRelevance(resume: StructuredResumeNER, jd: StructuredJD): number {
+function computeExperienceRelevance(
+  resume: StructuredResumeNER,
+  jd: StructuredJD,
+  resumeText: string
+): number {
   if (resume.employment.length === 0) return 0;
   if (jd.requiredSkills.length === 0) return 0.5;
 
-  const jdSkillsLower = new Set(jd.requiredSkills.map((s) => s.toLowerCase()));
+  const expandedResume = expandSkillAliases(resumeText).toLowerCase();
+  const resumeSkillNames = resume.skills.map((s) => s.skill);
+  const jdSkills = jd.requiredSkills.filter((s) => resolveSkill(s));
+
+  const skillMatchesJd = (skill: string, context: string): boolean => {
+    const skillLower = skill.toLowerCase();
+    if (context.includes(skillLower)) return true;
+    for (const rSkill of resumeSkillNames) {
+      if (resumeSkillSatisfies(skill, rSkill) && context.includes(rSkill.toLowerCase())) return true;
+    }
+    return false;
+  };
+
+  const globalMatch = jdSkills.some(
+    (skill) => skillMatchesJd(skill, expandedResume) || resumeSkillNames.some((r) => resumeSkillSatisfies(skill, r))
+  );
+  if (globalMatch && resume.employment.every((e) => !e.durationMonths)) {
+    return 0.65;
+  }
+
   let relevantMonths = 0;
   let totalMonths = 0;
 
   for (const emp of resume.employment) {
     totalMonths += emp.durationMonths || 12;
-    const bulletText = emp.bullets.join(" ").toLowerCase();
-    const hasRelevantSkill = [...jdSkillsLower].some((skill) => bulletText.includes(skill));
+    const context = expandSkillAliases(
+      [emp.title, emp.company, ...emp.bullets, ...resumeSkillNames].join(" ")
+    ).toLowerCase();
+    const hasRelevantSkill =
+      jdSkills.some((skill) => skillMatchesJd(skill, context)) ||
+      (globalMatch && /react|frontend|front[- ]end|html|css|javascript|ui|interface/i.test(context));
     if (hasRelevantSkill) {
       relevantMonths += emp.durationMonths || 12;
     }
   }
 
+  if (relevantMonths === 0 && globalMatch) return 0.55;
   return totalMonths > 0 ? Math.min(1, relevantMonths / totalMonths) : 0;
 }
 
@@ -214,7 +242,7 @@ function computeKeywordMatch(
       }
     }
 
-    // Related skill partial credit (PostgreSQL ≈ MongoDB, Node ≈ Express)
+    // Parent/child and related skill partial credit (React → JavaScript, Tailwind → CSS)
     if (!found) {
       let bestSimilarity = 0;
       let bestSource = "";
@@ -223,13 +251,18 @@ function computeKeywordMatch(
         ...resume.employment.flatMap((e) => e.skills),
       ];
       for (const rSkill of resumeSkillNames) {
+        if (resumeSkillSatisfies(term, rSkill)) {
+          bestSimilarity = 0.9;
+          bestSource = rSkill;
+          break;
+        }
         const { related, similarity } = areSkillsRelated(term, rSkill);
         if (related && similarity > bestSimilarity) {
           bestSimilarity = similarity;
           bestSource = rSkill;
         }
       }
-      if (bestSimilarity >= 0.5) {
+      if (bestSimilarity >= 0.3) {
         found = true;
         freq = 1;
         source = `related:${bestSource}`;
@@ -408,7 +441,7 @@ export function scoreEnterpriseATS(resumeText: string, jdText: string): Enterpri
   const impactScore = computeImpactDensity(allBullets);
   const sectionScore = computeSectionCompleteness(parsedResume);
   const formatScore = computeFormatScore(resumeText);
-  const experienceRelevance = computeExperienceRelevance(parsedResume, parsedJD);
+  const experienceRelevance = computeExperienceRelevance(parsedResume, parsedJD, resumeText);
 
   // Weights (enterprise-calibrated)
   const weights = {
@@ -435,8 +468,8 @@ export function scoreEnterpriseATS(resumeText: string, jdText: string): Enterpri
   let overallScore = Math.round(rawScore * 100);
   if (!knockoutResult.passed) {
     const hardFails = knockoutResult.failedFilters.filter((f) => f.severity === "hard").length;
-    const penalty = hardFails * 20;
-    overallScore = Math.max(5, overallScore - penalty);
+    const penalty = Math.min(40, hardFails * 15);
+    overallScore = Math.max(15, overallScore - penalty);
   }
 
   overallScore = Math.max(0, Math.min(100, overallScore));

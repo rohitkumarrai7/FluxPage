@@ -369,6 +369,61 @@ const JD_NOISE_WORDS = new Set([
   "competitive", "salary", "perks", "benefits",
 ]);
 
+const JD_SOFT_SKILL_WORDS = new Set([
+  "communication", "collaboration", "teamwork", "leadership", "mentoring",
+  "consulting", "strategy", "research", "analysis", "operations", "analytics",
+  "reporting", "networking", "outreach", "onboarding", "training",
+  "presenting", "negotiation", "stakeholder management", "partnership",
+]);
+
+const JD_METADATA_LINE =
+  /^(company|work\s*mode|location|duration|stipend|internship\s*type|employment\s*type|job\s*title|title|experience|salary|compensation|posted|apply|about\s*the\s*company)\s*:/i;
+
+const JD_SECTION_HEADERS: { type: "required" | "preferred" | "responsibilities" | "benefits" | "eligibility"; pattern: RegExp }[] = [
+  { type: "required", pattern: /^(requirements?|must\s*have|required\s*skills?|mandatory|qualifications?)\s*(?:\(.*\))?\s*:?\s*(.*)$/i },
+  { type: "preferred", pattern: /^(preferred\s*skills?|nice\s*to\s*have|good\s*to\s*have|bonus|desired|optional)\s*(?:\(.*\))?\s*:?\s*(.*)$/i },
+  { type: "eligibility", pattern: /^(eligibility\s*criteria?|who\s*you\s*are|who\s*we\s*are\s*looking\s*for)\s*:?\s*(.*)$/i },
+  { type: "responsibilities", pattern: /^(responsibilities|key\s*responsibilities|duties|what\s*you.?ll\s*do|tasks?)\s*:?\s*(.*)$/i },
+  { type: "benefits", pattern: /^(benefits?|perks?|we\s*offer|compensation)\s*:?\s*(.*)$/i },
+];
+
+const SKILL_LIST_FILLER =
+  /^(basic\s+understanding\s+of|awareness\s+of|familiarity\s+with|knowledge\s+of|experience\s+with|proficiency\s+in|understanding\s+of|comfortable\s+with|interest\s+in|ability\s+to|strong\s+experience\s+in|hands[- ]on\s+experience\s+in|good\s+knowledge\s+of)\s+/i;
+
+function classifyJDSectionLine(line: string): { type: "required" | "preferred" | "responsibilities" | "benefits" | "eligibility"; inlineContent: string } | null {
+  for (const { type, pattern } of JD_SECTION_HEADERS) {
+    const match = line.match(pattern);
+    if (match) {
+      return { type, inlineContent: (match[1] || "").trim() };
+    }
+  }
+  return null;
+}
+
+function isJDMetadataLine(line: string): boolean {
+  return JD_METADATA_LINE.test(line);
+}
+
+function parseSkillListLine(line: string, allowSoftSkills = true): string[] {
+  const cleaned = line.replace(/^[-•*▪▸►◆]\s*/, "").replace(SKILL_LIST_FILLER, "").trim();
+  if (!cleaned) return [];
+
+  const found = new Set<string>();
+  const addFrom = (text: string) => {
+    for (const skill of extractSkillsFromLine(text, allowSoftSkills)) {
+      found.add(skill);
+    }
+  };
+
+  addFrom(cleaned);
+  const parts = cleaned.split(/,|\band\b|\/|;|\|/i).map((s) => s.trim()).filter(Boolean);
+  for (const part of parts) {
+    addFrom(part.replace(SKILL_LIST_FILLER, "").trim());
+  }
+
+  return [...found];
+}
+
 export function parseJobDescription(jdText: string): StructuredJD {
   const lines = jdText.split("\n").map((l) => l.trim()).filter(Boolean);
   const lower = jdText.toLowerCase();
@@ -421,75 +476,94 @@ export function parseJobDescription(jdText: string): StructuredJD {
   if (/\bfull[- ]?time\b/i.test(jdText)) employmentType = "full_time";
   else if (/\bpart[- ]?time\b/i.test(jdText)) employmentType = "part_time";
   else if (/\bcontract\b/i.test(jdText)) employmentType = "contract";
-  else if (/\bintern(ship)?\b/i.test(jdText)) employmentType = "internship";
+  else if (/\binternship\b/i.test(jdText) || /\bintern\s+(?:role|position|developer|engineer)\b/i.test(jdText)) {
+    employmentType = "internship";
+  }
 
   // Location
   const locationMatch = jdText.match(/(?:location|based\s*in|office)\s*:?\s*([^\n,]{3,50})/i);
   if (locationMatch) location = locationMatch[1].trim();
 
   // Skills extraction from JD
-  let inRequired = false;
-  let inPreferred = false;
-  let inResponsibilities = false;
-  let inBenefits = false;
+  let section: "none" | "required" | "preferred" | "responsibilities" | "benefits" | "eligibility" = "none";
 
   for (const line of lines) {
-    const lineLower = line.toLowerCase();
+    const companyMatch = line.match(/^company\s*:\s*(.+)/i);
+    if (companyMatch) {
+      company = companyMatch[1].trim();
+      continue;
+    }
 
-    if (/^(requirements?|must\s*have|required|mandatory|qualifications?)\s*:?\s*$/i.test(line)) {
-      inRequired = true; inPreferred = false; inResponsibilities = false; inBenefits = false;
-      continue;
-    }
-    if (/^(preferred|nice\s*to\s*have|good\s*to\s*have|bonus|desired)\s*:?\s*$/i.test(line)) {
-      inPreferred = true; inRequired = false; inResponsibilities = false; inBenefits = false;
-      continue;
-    }
-    if (/^(responsibilities|duties|what\s*you.?ll\s*do|role|tasks?)\s*:?\s*$/i.test(line)) {
-      inResponsibilities = true; inRequired = false; inPreferred = false; inBenefits = false;
-      continue;
-    }
-    if (/^(benefits?|perks?|we\s*offer|compensation)\s*:?\s*$/i.test(line)) {
-      inBenefits = true; inRequired = false; inPreferred = false; inResponsibilities = false;
+    if (isJDMetadataLine(line)) continue;
+
+    const header = classifyJDSectionLine(line);
+    if (header) {
+      section = header.type === "eligibility" ? "required" : header.type;
+      if (header.inlineContent) {
+        const target = section === "preferred" ? preferredSkills : requiredSkills;
+        target.push(...parseSkillListLine(header.inlineContent, section !== "preferred"));
+      }
       continue;
     }
 
     const cleanLine = line.replace(/^[-•*▪▸►◆]\s*/, "").trim();
     if (cleanLine.length < 3) continue;
 
-    if (inRequired) {
-      const skills = extractSkillsFromLine(cleanLine);
-      requiredSkills.push(...skills);
-    } else if (inPreferred) {
-      const skills = extractSkillsFromLine(cleanLine);
-      preferredSkills.push(...skills);
-    } else if (inResponsibilities) {
+    if (company && cleanLine.toLowerCase().includes(company.toLowerCase()) && section === "none") {
+      continue;
+    }
+
+    if (section === "required") {
+      requiredSkills.push(...parseSkillListLine(cleanLine, true));
+    } else if (section === "preferred") {
+      preferredSkills.push(...parseSkillListLine(cleanLine, true));
+    } else if (section === "responsibilities") {
       responsibilities.push(cleanLine);
-    } else if (inBenefits) {
+    } else if (section === "benefits") {
       benefits.push(cleanLine);
-    } else {
-      // Heuristic: lines with skill-like content go to required by default
-      const skills = extractSkillsFromLine(cleanLine);
-      if (skills.length > 0) requiredSkills.push(...skills);
+    } else if (section === "none") {
+      const techSkills = extractSkillsFromLine(cleanLine, false);
+      if (techSkills.length > 0) {
+        if (/must\s*have|required|mandatory|should\s*have|looking\s*for|experience\s*in|proficien|strong\s+experience/i.test(cleanLine)) {
+          requiredSkills.push(...techSkills);
+        } else if (/preferred|nice\s*to\s*have|bonus|good\s*to\s*have/i.test(cleanLine)) {
+          preferredSkills.push(...techSkills);
+        }
+      }
     }
   }
 
   return {
-    title, company, requiredSkills: enrichJDKeywords(jdText, [...new Set(requiredSkills)], [...new Set(preferredSkills)], responsibilities),
-    preferredSkills: [...new Set(preferredSkills)],
+    title, company, requiredSkills: enrichJDKeywords(jdText, [...new Set(requiredSkills)], title),
+    preferredSkills: enrichJDPreferredKeywords([...new Set(preferredSkills)]),
     minYearsExperience: minYears, maxYearsExperience: maxYears,
     requiredEducation, location, employmentType, isRemote,
     responsibilities, benefits, knockouts,
   };
 }
 
-function extractSkillsFromLine(line: string): string[] {
-  const techPattern = /\b(python|java|javascript|typescript|react|angular|vue|node\.?js|next\.?js|express|django|flask|spring\s*boot|spring|ruby|rails|go|golang|rust|swift|kotlin|c\+\+|c#|\.net|php|laravel|scala|sql|mysql|postgresql|postgres|mongodb|redis|elasticsearch|kafka|docker|kubernetes|k8s|aws|azure|gcp|terraform|ansible|jenkins|git|github|gitlab|jira|confluence|figma|tableau|power\s*bi|pandas|numpy|tensorflow|pytorch|scikit-learn|keras|spark|hadoop|airflow|snowflake|databricks|graphql|rest|microservices|ci\/cd|devops|linux|bash|html|css|sass|tailwind|bootstrap|webpack|vite|jest|cypress|selenium|agile|scrum|kanban|machine\s*learning|deep\s*learning|nlp|computer\s*vision|data\s*science|data\s*engineering)\b/gi;
+function extractSkillsFromLine(line: string, allowSoftSkills = true): string[] {
+  const techPattern =
+    /\b(python|java|javascript|typescript|react|angular|vue|node\.?js|next\.?js|express|django|flask|spring\s*boot|spring|ruby|rails|golang|rust|swift|kotlin|c\+\+|c#|\.net|php|laravel|scala|sql|mysql|postgresql|postgres|mongodb|redis|elasticsearch|kafka|docker|kubernetes|k8s|aws|azure|gcp|terraform|ansible|jenkins|git|github|gitlab|jira|confluence|figma|tableau|power\s*bi|pandas|numpy|tensorflow|pytorch|scikit-learn|keras|spark|hadoop|airflow|snowflake|databricks|graphql|rest\s*api|restful|microservices|ci\/cd|devops|linux|bash|html5?|css3?|sass|tailwind|bootstrap|webpack|vite|jest|cypress|selenium|agile|scrum|kanban|machine\s*learning|deep\s*learning|nlp|computer\s*vision|data\s*science|data\s*engineering|responsive\s*design|ui\/ux|frontend|front[- ]end)\b/gi;
 
-  const businessPattern = /\b(business\s*development|inside\s*sales|outside\s*sales|sales|marketing|lead\s*generation|prospecting|cold\s*calling|pipeline\s*development|crm|salesforce|hubspot|zoho|account\s*management|client\s*acquisition|client\s*relations|customer\s*success|market\s*research|market\s*analysis|competitive\s*analysis|revenue\s*growth|quota|closing|negotiation|stakeholder\s*management|partnership|strategic\s*partnership|asset\s*sourcing|due\s*diligence|financial\s*modeling|financial\s*analysis|pitch\s*deck|proposal|rfp|international|cross[- ]border|export|import|market\s*entry|go[- ]to[- ]market|product\s*launch|launch\s*planning|new\s*product\s*development|proactive\s*outreach|relationship\s*building|presenting|communication|excel|powerpoint|linkedin|social\s*media|content\s*marketing|seo|sem|brand\s*management|digital\s*marketing|email\s*marketing|campaign\s*management|analytics|reporting|operations|project\s*management|consulting|strategy|strategic\s*planning|research|analysis|outreach|networking|onboarding|training|mentoring|leadership|teamwork|collaboration)\b/gi;
+  const businessPattern =
+    /\b(business\s*development|inside\s*sales|outside\s*sales|sales|marketing|lead\s*generation|prospecting|cold\s*calling|pipeline\s*development|crm|salesforce|hubspot|zoho|account\s*management|client\s*acquisition|client\s*relations|customer\s*success|market\s*research|market\s*analysis|competitive\s*analysis|revenue\s*growth|quota|closing|negotiation|stakeholder\s*management|partnership|strategic\s*partnership|asset\s*sourcing|due\s*diligence|financial\s*modeling|financial\s*analysis|pitch\s*deck|proposal|rfp|international|cross[- ]border|export|import|market\s*entry|go[- ]to[- ]market|product\s*launch|launch\s*planning|new\s*product\s*development|proactive\s*outreach|relationship\s*building|presenting|communication|excel|powerpoint|linkedin|social\s*media|content\s*marketing|seo|sem|brand\s*management|digital\s*marketing|email\s*marketing|campaign\s*management|analytics|reporting|operations|project\s*management|consulting|strategy|strategic\s*planning|research|analysis|outreach|networking|onboarding|training|mentoring|leadership|teamwork|collaboration)\b/gi;
 
-  const techMatches = (line.match(techPattern) || []).map((m) => m.toLowerCase().trim());
-  const bizMatches = (line.match(businessPattern) || []).map((m) => m.toLowerCase().trim().replace(/\s+/g, " "));
-  return [...techMatches, ...bizMatches].filter((s) => !JD_NOISE_WORDS.has(s));
+  const techMatches = (line.match(techPattern) || []).map((m) => normalizeTechToken(m));
+  const bizMatches = allowSoftSkills
+    ? (line.match(businessPattern) || []).map((m) => m.toLowerCase().trim().replace(/\s+/g, " "))
+    : [];
+
+  return [...techMatches, ...bizMatches].filter((s) => !JD_NOISE_WORDS.has(s) && (!allowSoftSkills ? !JD_SOFT_SKILL_WORDS.has(s) : true));
+}
+
+function normalizeTechToken(token: string): string {
+  const lower = token.toLowerCase().trim().replace(/\s+/g, " ");
+  if (lower === "html5" || lower === "html") return "html";
+  if (lower === "css3" || lower === "css") return "css";
+  if (lower === "front-end" || lower === "front end" || lower === "frontend") return "frontend";
+  if (lower === "rest api" || lower === "restful") return "rest";
+  return lower;
 }
 
 const JD_PHRASE_PATTERN = /\b(new product development|asset sourcing|proactive outreach|business development|launch planning|market research|market analysis|lead generation|cold calling|account management|client acquisition|stakeholder management|strategic partnership|go-to-market|go to market|product launch|pipeline development|relationship building|competitive analysis|financial modeling|due diligence|cross-border|cross border|inside sales|outside sales|social media marketing|content marketing|digital marketing|email marketing|project management|customer success|revenue growth)\b/gi;
@@ -502,42 +576,29 @@ function extractKeyPhrases(line: string): string[] {
   while ((match = re.exec(clean)) !== null) {
     phrases.push(match[0].toLowerCase().replace(/\s+/g, " "));
   }
-  if (clean.length >= 12 && clean.length <= 70 && !/^https?:\/\//i.test(clean)) {
-    const short = clean.slice(0, 55).trim();
-    if (short.split(/\s+/).length >= 2) phrases.push(short.toLowerCase());
-  }
   return phrases;
 }
 
-function enrichJDKeywords(
-  jdText: string,
-  required: string[],
-  preferred: string[],
-  responsibilities: string[]
-): string[] {
-  const terms = new Set([...required, ...preferred]);
+function enrichJDKeywords(jdText: string, required: string[], title: string): string[] {
+  const terms = new Set(required);
 
-  // Scan full JD for domain terms
-  const fullLine = jdText.replace(/\n/g, " ");
-  const bizRe = /\b(business\s*development|inside\s*sales|sales|marketing|lead\s*generation|prospecting|pipeline|crm|salesforce|hubspot|account\s*management|market\s*research|asset\s*sourcing|proactive\s*outreach|new\s*product\s*development|launch\s*planning|stakeholder|partnership|negotiation|international|excel|powerpoint|social\s*media|content\s*marketing|digital\s*marketing|go[- ]to[- ]market|product\s*launch|due\s*diligence|financial\s*modeling|client\s*acquisition|relationship\s*building|competitive\s*analysis|revenue|outreach|networking|strategy|consulting|operations|analytics|reporting)\b/gi;
-  let m;
-  while ((m = bizRe.exec(fullLine)) !== null) {
-    terms.add(m[0].toLowerCase().replace(/\s+/g, " "));
+  if (title && title.length > 3 && title.length < 120) {
+    for (const s of extractSkillsFromLine(title, false)) terms.add(s);
+    for (const p of extractKeyPhrases(title)) terms.add(p);
   }
 
-  for (const resp of responsibilities) {
-    for (const p of extractKeyPhrases(resp)) terms.add(p);
-    for (const s of extractSkillsFromLine(resp)) terms.add(s);
+  if (terms.size < 4) {
+    for (const line of jdText.split("\n")) {
+      if (isJDMetadataLine(line.trim())) continue;
+      for (const s of extractSkillsFromLine(line, false)) terms.add(s);
+    }
   }
 
-  // Title-derived terms
-  const titleMatch = jdText.split("\n")[0]?.trim();
-  if (titleMatch && titleMatch.length > 3 && titleMatch.length < 80) {
-    for (const p of extractKeyPhrases(titleMatch)) terms.add(p);
-    for (const s of extractSkillsFromLine(titleMatch)) terms.add(s);
-  }
+  return [...terms].filter((t) => t.length > 2 && !JD_NOISE_WORDS.has(t)).slice(0, 25);
+}
 
-  return [...terms].filter((t) => t.length > 2 && !JD_NOISE_WORDS.has(t)).slice(0, 35);
+function enrichJDPreferredKeywords(preferred: string[]): string[] {
+  return preferred.filter((t) => t.length > 2 && !JD_NOISE_WORDS.has(t)).slice(0, 15);
 }
 
 // ─── Main Resume Parser ────────────────────────────────────────────────────────
