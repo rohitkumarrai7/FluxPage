@@ -723,13 +723,18 @@ async function analyzeJob(ctx) {
   var analysis;
   if (settings.mockMode) {
     analysis = mockAnalyze(resume, jobDescription);
+    analysis.mock = true;
+    analysis.mockReason = "mockMode enabled in extension settings";
   } else {
     try {
       analysis = await callAnalyzeApi(settings, { resume: resume, jobDescription: jobDescription, jobTitle: jobTitle, jobUrl: jobUrl, source: source });
     } catch (err) {
-      analysis = mockAnalyze(resume, jobDescription);
-      analysis.mock = true;
-      analysis.mockReason = err.message;
+      try {
+        await new Promise(function (r) { setTimeout(r, 1200); });
+        analysis = await callAnalyzeApi(settings, { resume: resume, jobDescription: jobDescription, jobTitle: jobTitle, jobUrl: jobUrl, source: source });
+      } catch (retryErr) {
+        throw new Error("ATS analysis unavailable. Check your connection and try again. (" + (retryErr.message || err.message) + ")");
+      }
     }
   }
 

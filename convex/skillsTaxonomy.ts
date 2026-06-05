@@ -121,15 +121,53 @@ const TAXONOMY: SkillNode[] = [
   { id: "stakeholder_management", name: "Stakeholder Management", aliases: ["stakeholder engagement", "cross functional"], parent: "soft_skills", domain: "management", category: "leadership", weight: 0.6 },
 
   // === HEALTHCARE ===
-  { id: "epic_emr", name: "Epic EMR", aliases: ["epic", "epic systems", "electronic medical records"], parent: "healthcare_systems", domain: "healthcare", category: "healthcare", weight: 0.9 },
+  { id: "epic_emr", name: "Epic EMR", aliases: ["epic", "epic systems", "electronic medical records", "emr", "ehr"], parent: "healthcare_systems", domain: "healthcare", category: "healthcare", weight: 0.9 },
   { id: "acls", name: "ACLS", aliases: ["advanced cardiac life support"], parent: "healthcare_certs", domain: "healthcare", category: "healthcare", weight: 0.8 },
+  { id: "bls", name: "BLS", aliases: ["basic life support", "bls certified"], parent: "healthcare_certs", domain: "healthcare", category: "healthcare", weight: 0.7 },
   { id: "patient_care", name: "Patient Care", aliases: ["clinical care", "bedside care", "direct patient care"], parent: "healthcare_skills", domain: "healthcare", category: "healthcare", weight: 0.9 },
+  { id: "icu", name: "ICU", aliases: ["intensive care unit", "critical care", "icu experience"], parent: "healthcare_skills", domain: "healthcare", category: "healthcare", weight: 0.9 },
+  { id: "hipaa", name: "HIPAA", aliases: ["hipaa compliance", "health insurance portability"], parent: "healthcare_compliance", domain: "healthcare", category: "healthcare", weight: 0.8 },
+  { id: "clinical_documentation", name: "Clinical Documentation", aliases: ["clinical documentation", "charting", "medical records"], parent: "healthcare_skills", domain: "healthcare", category: "healthcare", weight: 0.7 },
+  { id: "registered_nurse", name: "Registered Nurse", aliases: ["rn", "registered nurse", "nursing"], parent: "healthcare_roles", domain: "healthcare", category: "healthcare", weight: 0.9 },
 
   // === FINANCE ===
-  { id: "financial_modeling", name: "Financial Modeling", aliases: ["financial models", "dcf", "valuation"], parent: "finance_skills", domain: "finance", category: "finance", weight: 0.9 },
+  { id: "financial_modeling", name: "Financial Modeling", aliases: ["financial models", "financial modelling"], parent: "finance_skills", domain: "finance", category: "finance", weight: 0.9 },
+  { id: "valuation", name: "Valuation", aliases: ["company valuation", "dcf", "discounted cash flow"], parent: "finance_skills", domain: "finance", category: "finance", weight: 0.9 },
+  { id: "equity_research", name: "Equity Research", aliases: ["equity research", "stock research", "coverage universe"], parent: "finance_skills", domain: "finance", category: "finance", weight: 0.9 },
+  { id: "financial_analysis", name: "Financial Analysis", aliases: ["financial analysis", "earnings forecasts"], parent: "finance_skills", domain: "finance", category: "finance", weight: 0.8 },
   { id: "bloomberg", name: "Bloomberg Terminal", aliases: ["bloomberg", "bloomberg terminal"], parent: "finance_tools", domain: "finance", category: "finance", weight: 0.7 },
-  { id: "excel_advanced", name: "Advanced Excel", aliases: ["excel", "vlookup", "pivot tables", "macros", "vba"], parent: "finance_tools", domain: "finance", category: "finance", weight: 0.8 },
+  { id: "excel_advanced", name: "Advanced Excel", aliases: ["excel", "vlookup", "pivot tables", "macros", "vba", "ms excel"], parent: "finance_tools", domain: "finance", category: "finance", weight: 0.8 },
   { id: "cfa", name: "CFA", aliases: ["chartered financial analyst", "cfa level"], parent: "finance_certs", domain: "finance", category: "finance", weight: 0.8 },
+
+  // === LEGAL ===
+  { id: "litigation", name: "Litigation", aliases: ["litigation support", "trial preparation"], parent: "legal_skills", domain: "legal", category: "legal", weight: 0.9 },
+  { id: "legal_research", name: "Legal Research", aliases: ["legal research", "case research", "westlaw", "lexisnexis"], parent: "legal_skills", domain: "legal", category: "legal", weight: 0.9 },
+  { id: "contract_drafting", name: "Contract Drafting", aliases: ["contract drafting", "contract review", "agreements"], parent: "legal_skills", domain: "legal", category: "legal", weight: 0.8 },
+  { id: "compliance", name: "Compliance", aliases: ["compliance", "regulatory compliance", "regulatory matters"], parent: "legal_skills", domain: "legal", category: "legal", weight: 0.8 },
+  { id: "regulatory", name: "Regulatory", aliases: ["regulatory", "regulatory affairs", "regulation"], parent: "legal_skills", domain: "legal", category: "legal", weight: 0.7 },
+
+  // === MARKETING ===
+  { id: "digital_marketing", name: "Digital Marketing", aliases: ["digital marketing", "online marketing"], parent: "marketing_skills", domain: "marketing", category: "marketing", weight: 0.9 },
+  { id: "social_media_marketing", name: "Social Media Marketing", aliases: ["social media marketing", "social media", "social media management"], parent: "marketing_skills", domain: "marketing", category: "marketing", weight: 0.9 },
+  { id: "lead_generation", name: "Lead Generation", aliases: ["lead generation", "lead gen", "prospecting"], parent: "marketing_skills", domain: "marketing", category: "marketing", weight: 0.8 },
+  { id: "content_creation", name: "Content Creation", aliases: ["content creation", "content marketing", "copywriting"], parent: "marketing_skills", domain: "marketing", category: "marketing", weight: 0.8 },
+  { id: "seo", name: "SEO", aliases: ["seo", "search engine optimization", "sem"], parent: "marketing_skills", domain: "marketing", category: "marketing", weight: 0.8 },
+  { id: "google_analytics", name: "Google Analytics", aliases: ["google analytics", "ga4", "web analytics"], parent: "marketing_tools", domain: "marketing", category: "marketing", weight: 0.7 },
+
+  // === HR / RECRUITING ===
+  { id: "talent_acquisition", name: "Talent Acquisition", aliases: ["talent acquisition", "recruiting", "recruitment", "full-cycle recruiting"], parent: "hr_skills", domain: "hr", category: "hr", weight: 0.9 },
+  { id: "onboarding", name: "Onboarding", aliases: ["onboarding", "employee onboarding", "new hire onboarding"], parent: "hr_skills", domain: "hr", category: "hr", weight: 0.8 },
+  { id: "workday", name: "Workday", aliases: ["workday", "workday hcm", "workday ats"], parent: "hr_tools", domain: "hr", category: "hr", weight: 0.8 },
+  { id: "payroll", name: "Payroll", aliases: ["payroll", "payroll administration"], parent: "hr_skills", domain: "hr", category: "hr", weight: 0.7 },
+
+  // === QA (expanded) ===
+  { id: "test_automation", name: "Test Automation", aliases: ["test automation", "automation testing", "automated testing", "ui test automation"], parent: "testing_practices", domain: "engineering", category: "testing", weight: 0.8 },
+  { id: "api_testing", name: "API Testing", aliases: ["api testing", "rest api testing", "postman"], parent: "testing_practices", domain: "engineering", category: "testing", weight: 0.7 },
+
+  // === DESIGN (expanded) ===
+  { id: "wireframing", name: "Wireframing", aliases: ["wireframing", "wireframes", "low-fidelity prototypes"], parent: "design_disciplines", domain: "design", category: "design", weight: 0.7 },
+  { id: "prototyping", name: "Prototyping", aliases: ["prototyping", "high-fidelity prototypes", "interactive prototypes"], parent: "design_disciplines", domain: "design", category: "design", weight: 0.7 },
+  { id: "user_research", name: "User Research", aliases: ["user research", "usability testing", "user interviews"], parent: "design_disciplines", domain: "design", category: "design", weight: 0.8 },
 ];
 
 // ─── Category Hierarchy ────────────────────────────────────────────────────────
@@ -187,6 +225,16 @@ const CATEGORY_HIERARCHY: Record<string, { parent: string | null; label: string;
   finance_tools: { parent: "finance", label: "Finance Tools", domain: "finance" },
   finance_certs: { parent: "finance", label: "Finance Certifications", domain: "finance" },
   finance: { parent: null, label: "Finance", domain: "finance" },
+  legal_skills: { parent: "legal", label: "Legal Skills", domain: "legal" },
+  legal: { parent: null, label: "Legal", domain: "legal" },
+  marketing_skills: { parent: "marketing", label: "Marketing Skills", domain: "marketing" },
+  marketing_tools: { parent: "marketing", label: "Marketing Tools", domain: "marketing" },
+  marketing: { parent: null, label: "Marketing", domain: "marketing" },
+  hr_skills: { parent: "hr", label: "HR Skills", domain: "hr" },
+  hr_tools: { parent: "hr", label: "HR Tools", domain: "hr" },
+  hr: { parent: null, label: "Human Resources", domain: "hr" },
+  healthcare_compliance: { parent: "healthcare", label: "Healthcare Compliance", domain: "healthcare" },
+  healthcare_roles: { parent: "healthcare", label: "Healthcare Roles", domain: "healthcare" },
 };
 
 // ─── Lookup Indexes ────────────────────────────────────────────────────────────
@@ -373,6 +421,18 @@ export function computeTaxonomyMatchScore(
     if (bestRelated >= 0.5) {
       relatedMatches.push({ jdSkill, resumeSkill: bestResumeSkill, similarity: bestRelated });
       earnedWeight += weight * bestRelated;
+      continue;
+    }
+
+    // Literal fallback for domain terms not yet in taxonomy nodes
+    const jdLower = jdSkill.toLowerCase();
+    const literalInResume = resumeSkills.some((r) => {
+      const rLower = r.toLowerCase();
+      return rLower.includes(jdLower) || jdLower.includes(rLower);
+    });
+    if (literalInResume) {
+      exactMatches.push(jdSkill);
+      earnedWeight += weight * 0.85;
     } else {
       totalMissing.push(jdSkill);
     }
@@ -435,9 +495,12 @@ export function inferDominantDomain(text: string, skills: string[]): string | nu
       /\bchef\b/i, /\bkitchen\b/i, /\bculinary\b/i, /\bcuisine\b/i,
       /\brestaurant\b/i, /\bmenu\b/i, /\bhaccp\b/i, /\bsous\b/i, /\bcook\b/i,
     ],
-    healthcare: [/\bnurse\b/i, /\bclinical\b/i, /\bpatient\b/i, /\bhospital\b/i, /\bmedical\b/i],
-    finance: [/\bfinancial\b/i, /\baccounting\b/i, /\binvestment\b/i, /\baudit\b/i, /\bcpa\b/i],
+    healthcare: [/\bnurse\b/i, /\brn\b/i, /\bclinical\b/i, /\bpatient\b/i, /\bhospital\b/i, /\bmedical\b/i, /\bicu\b/i],
+    finance: [/\bfinancial\b/i, /\baccounting\b/i, /\binvestment\b/i, /\baudit\b/i, /\bcpa\b/i, /\bequity\b/i, /\bvaluation\b/i],
     design: [/\bux\b/i, /\bui\b/i, /\bfigma\b/i, /\bgraphic\s*design/i, /\bproduct\s*design/i],
+    legal: [/\battorney\b/i, /\blawyer\b/i, /\blitigation\b/i, /\blegal\b/i, /\bparalegal\b/i, /\bcompliance\b/i],
+    marketing: [/\bmarketing\b/i, /\bdigital\s*marketing/i, /\bsocial\s*media/i, /\bseo\b/i, /\bbrand\b/i],
+    hr: [/\brecruiter\b/i, /\brecruiting\b/i, /\btalent\s*acquisition/i, /\bhuman\s*resources/i, /\bhris\b/i, /\bworkday\b/i],
   };
 
   const combined = expandSkillAliases(text);

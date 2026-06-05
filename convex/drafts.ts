@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { scoreResumeAgainstJD } from "./atsScoring";
-import { parseResumeText, buildSuggestions } from "./resumeParser";
+import { parseResumeText } from "./resumeParser";
 import { assertCanCreateTailor, incrementTailorUsage, resetTailorUsage } from "./planLimits";
 
 const NON_SKILL_KW = new Set([
@@ -272,17 +272,14 @@ export const create = mutation({
       ).filter(Boolean);
     }
 
-    const structuredResume = resumeText ? parseResumeText(resumeText) : null;
-    const aiSuggestions = structuredResume
-      ? buildSuggestions(structuredResume, missingKw, [])
-      : [];
-
     const gapAnalysis = {
       missingKeywords: missingKw.slice(0, 10),
       matchedKeywords: matchedKw,
-      suggestions: aiSuggestions.map((s) => s.suggestedText),
+      suggestions: rawSuggestions.slice(0, 10),
       optimizedKeywords: [...missingKw.slice(0, 8)].filter((kw) => !matchedKw.includes(kw)),
     };
+
+    const structuredResume = resumeText ? parseResumeText(resumeText) : null;
 
     await incrementTailorUsage(ctx, args.userId);
 
@@ -301,7 +298,7 @@ export const create = mutation({
         resumeOriginalText: resumeText.slice(0, 10000),
         localSuggestions: args.localSuggestions || [],
         structuredResume,
-        aiSuggestions,
+        aiSuggestions: [],
       },
       originalLatex: "",
       currentLatex: "",

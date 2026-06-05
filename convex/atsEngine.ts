@@ -8,7 +8,7 @@
 // This replaces simple keyword matching with a multi-signal pipeline.
 
 import { parseResumeNER, parseJobDescription, type StructuredResumeNER, type StructuredJD } from "./nerParser";
-import { computeTaxonomyMatchScore, resolveSkill, expandSkillAliases, areSkillsRelated, resumeSkillSatisfies } from "./skillsTaxonomy";
+import { computeTaxonomyMatchScore, resolveSkill, expandSkillAliases, areSkillsRelated, resumeSkillSatisfies, inferDominantDomain } from "./skillsTaxonomy";
 import { computeSemanticSimilarity } from "./semanticEngine";
 import { applyKnockoutFilters, type KnockoutResult } from "./knockoutFilters";
 
@@ -26,6 +26,7 @@ export interface EnterpriseATSResult {
     formatCompatibility: number;
     impactDensity: number;
     experienceRelevance: number;
+    industryAlignment: number;
   };
   weights: {
     keyword: number;
@@ -35,6 +36,7 @@ export interface EnterpriseATSResult {
     format: number;
     impact: number;
     experience: number;
+    industry: number;
   };
   matchedKeywords: { keyword: string; frequency: number; source: string }[];
   missingKeywords: { keyword: string; importance: string; suggestion: string }[];
@@ -182,6 +184,37 @@ function computeExperienceRelevance(
   return totalMonths > 0 ? Math.min(1, relevantMonths / totalMonths) : 0;
 }
 
+const INDUSTRY_COMPATIBLE: Record<string, Set<string>> = {
+  engineering: new Set(["engineering", "infrastructure", "data_science", "data", "design", "management"]),
+  infrastructure: new Set(["engineering", "infrastructure", "data_science", "data"]),
+  data_science: new Set(["engineering", "data_science", "data", "analytics", "infrastructure"]),
+  data: new Set(["engineering", "data_science", "data", "infrastructure", "analytics"]),
+  analytics: new Set(["data_science", "data", "analytics", "finance", "engineering"]),
+  design: new Set(["engineering", "design", "marketing"]),
+  management: new Set(["engineering", "management", "finance", "hr"]),
+  finance: new Set(["finance", "analytics", "management"]),
+  healthcare: new Set(["healthcare"]),
+  legal: new Set(["legal", "finance", "management"]),
+  marketing: new Set(["marketing", "analytics", "design"]),
+  hr: new Set(["hr", "management"]),
+  culinary: new Set(["culinary"]),
+};
+
+function computeIndustryAlignment(
+  resumeText: string,
+  jdText: string,
+  resumeSkills: string[]
+): number {
+  const jdDomain = inferDominantDomain(jdText, []);
+  const resumeDomain = inferDominantDomain(resumeText, resumeSkills);
+  if (!jdDomain || !resumeDomain) return 0.55;
+  if (jdDomain === resumeDomain) return 1.0;
+  const compatible =
+    INDUSTRY_COMPATIBLE[jdDomain]?.has(resumeDomain) ||
+    INDUSTRY_COMPATIBLE[resumeDomain]?.has(jdDomain);
+  return compatible ? 0.72 : 0.22;
+}
+
 // ─── Keyword Match with Taxonomy Awareness ─────────────────────────────────────
 
 function computeKeywordMatch(
@@ -196,12 +229,21 @@ function computeKeywordMatch(
   const resumeLower = expandSkillAliases(resumeText).toLowerCase();
   const resumeSkillsLower = new Set(resume.skills.map((s) => s.skill.toLowerCase()));
 
+  const experienceSummaryParts: string[] = [];
+  const summarySection = resume.rawSections?.find((s) => /summary|objective|profile/i.test(s.heading));
+  if (summarySection?.content) experienceSummaryParts.push(summarySection.content);
+  for (const emp of resume.employment) {
+    experienceSummaryParts.push(emp.title, emp.company, ...emp.bullets);
+  }
+  const experienceSummaryLower = expandSkillAliases(experienceSummaryParts.join(" ")).toLowerCase();
+
   const allJdTerms = [...new Set([...jd.requiredSkills, ...jd.preferredSkills])];
   if (allJdTerms.length === 0) return { score: 0.5, matched: [], missing: [] };
 
   const matched: { keyword: string; frequency: number; source: string }[] = [];
   const missing: { keyword: string; importance: string; suggestion: string }[] = [];
   let earnedWeight = 0;
+  let skillsOnlyWeight = 0;
 
   for (const term of allJdTerms) {
     const termLower = term.toLowerCase();
@@ -290,6 +332,11 @@ function computeKeywordMatch(
       }
     }
 
+    if (found && !experienceSummaryLower.includes(termLower)) {
+      matchWeight *= 0.4;
+      skillsOnlyWeight += matchWeight;
+    }
+
     earnedWeight += matchWeight;
 
     if (found) {
@@ -298,6 +345,11 @@ function computeKeywordMatch(
       const importance = jd.requiredSkills.includes(term) ? "required" : "preferred";
       missing.push({ keyword: term, importance, suggestion: `Add '${term}' where truthful` });
     }
+  }
+
+  const maxSkillsOnlyContribution = allJdTerms.length * 0.4;
+  if (skillsOnlyWeight > maxSkillsOnlyContribution) {
+    earnedWeight -= skillsOnlyWeight - maxSkillsOnlyContribution;
   }
 
   const score = allJdTerms.length > 0 ? earnedWeight / allJdTerms.length : 0;
@@ -442,16 +494,22 @@ export function scoreEnterpriseATS(resumeText: string, jdText: string): Enterpri
   const sectionScore = computeSectionCompleteness(parsedResume);
   const formatScore = computeFormatScore(resumeText);
   const experienceRelevance = computeExperienceRelevance(parsedResume, parsedJD, resumeText);
+  const industryAlignment = computeIndustryAlignment(
+    resumeText,
+    jdText,
+    resumeSkillNames
+  );
 
-  // Weights (enterprise-calibrated)
+  // Weights (enterprise-calibrated, includes industry alignment)
   const weights = {
-    keyword: 0.25,
+    keyword: 0.23,
     taxonomy: 0.15,
-    semantic: 0.20,
+    semantic: 0.18,
     section: 0.10,
     format: 0.10,
     impact: 0.10,
-    experience: 0.10,
+    experience: 0.09,
+    industry: 0.05,
   };
 
   // Compute weighted score
@@ -462,7 +520,8 @@ export function scoreEnterpriseATS(resumeText: string, jdText: string): Enterpri
     sectionScore * weights.section +
     formatScore * weights.format +
     impactScore * weights.impact +
-    experienceRelevance * weights.experience;
+    experienceRelevance * weights.experience +
+    industryAlignment * weights.industry;
 
   // Apply knockout penalty
   let overallScore = Math.round(rawScore * 100);
@@ -482,6 +541,7 @@ export function scoreEnterpriseATS(resumeText: string, jdText: string): Enterpri
     formatCompatibility: Math.round(formatScore * 100),
     impactDensity: Math.round(impactScore * 100),
     experienceRelevance: Math.round(experienceRelevance * 100),
+    industryAlignment: Math.round(industryAlignment * 100),
   };
 
   const result: Partial<EnterpriseATSResult> = {
@@ -551,7 +611,7 @@ export function scoreResumeAgainstJD(resumeText: string, jdText: string): {
       sectionCompleteness: enterprise.breakdown.sectionCompleteness,
       formatCompatibility: enterprise.breakdown.formatCompatibility,
       impactDensity: enterprise.breakdown.impactDensity,
-      weights: { keyword: 0.25, semantic: 0.20, section: 0.10, format: 0.10, impact: 0.10 },
+      weights: enterprise.weights,
     },
   };
 }

@@ -237,6 +237,9 @@ const COMPATIBLE_DOMAINS: Record<string, Set<string>> = {
   finance: new Set(["finance", "analytics", "management"]),
   healthcare: new Set(["healthcare"]),
   culinary: new Set(["culinary"]),
+  legal: new Set(["legal", "finance", "management"]),
+  marketing: new Set(["marketing", "analytics", "design"]),
+  hr: new Set(["hr", "management"]),
 };
 
 function domainsAreCompatible(jdDomain: string, resumeDomain: string): boolean {

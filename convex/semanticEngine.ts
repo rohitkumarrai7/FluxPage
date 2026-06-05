@@ -13,6 +13,27 @@ export interface SemanticResult {
 
 // ─── Text Processing ───────────────────────────────────────────────────────────
 
+/** Cross-domain synonym normalization (improves TF-IDF without external embeddings). */
+const SEMANTIC_SYNONYMS: Record<string, string> = {
+  "devops": "operations",
+  "sre": "operations",
+  "fullstack": "engineering",
+  "frontend": "engineering",
+  "backend": "engineering",
+  "rn": "nurse",
+  "registered": "nurse",
+  "attorney": "legal",
+  "lawyer": "legal",
+  "recruiter": "hr",
+  "recruiting": "hr",
+  "recruitment": "hr",
+  "analyst": "analysis",
+  "analyse": "analysis",
+  "analyze": "analysis",
+  "optimise": "optimize",
+  "optimisation": "optimization",
+};
+
 const SEMANTIC_STOP_WORDS = new Set([
   "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
   "of", "with", "by", "from", "is", "was", "are", "were", "be", "been",
@@ -34,6 +55,7 @@ function tokenize(text: string): string[] {
     .replace(/[^a-z0-9+#.\-/\s]/g, " ");
   return normalized
     .split(/\s+/)
+    .map((t) => SEMANTIC_SYNONYMS[t] || t)
     .filter((t) => t.length > 1 && !SEMANTIC_STOP_WORDS.has(t));
 }
 
