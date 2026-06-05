@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatForTailor } from "@/lib/llm";
-import { analyzeJobDescription, mergeJDKeywordsWithATS, type JDAnalysis } from "@/lib/jdAnalyzer";
+import {
+  analyzeJobDescription,
+  analyzeJobDescriptionFast,
+  mergeJDKeywordsWithATS,
+  type JDAnalysis,
+} from "@/lib/jdAnalyzer";
 import type { StructuredResume, TailorSuggestion } from "@/lib/resumeParser";
 import {
   buildResumeStructureContext,
@@ -230,8 +235,12 @@ export async function POST(req: NextRequest) {
     let jdAnalysis: JDAnalysis | null = null;
 
     try {
+      const hasExtensionKeywords =
+        enhancedMissing.length >= 5 || enhancedMatched.length >= 5;
       if (cachedJdAnalysis?.hardSkills) {
         jdAnalysis = cachedJdAnalysis as JDAnalysis;
+      } else if (hasExtensionKeywords) {
+        jdAnalysis = analyzeJobDescriptionFast(jobDescription, jobTitle);
       } else {
         jdAnalysis = await analyzeJobDescription(jobDescription, jobTitle);
       }
@@ -262,7 +271,7 @@ export async function POST(req: NextRequest) {
       system: systemPrompt,
       user: userPrompt,
       temperature: intensityLevel === "high" ? 0.45 : 0.25,
-      maxTokens: 8192,
+      maxTokens: 4096,
     });
 
     if (!result?.content) {
@@ -298,12 +307,12 @@ export async function POST(req: NextRequest) {
       return out;
     }
 
-    for (let attempt = 0; attempt < 3 && suggestions.length < minCount; attempt++) {
+    for (let attempt = 0; attempt < 1 && suggestions.length < minCount; attempt++) {
       const retry = await chatForTailor({
         system: systemPrompt,
         user: `${userPrompt}\n\nYou returned only ${suggestions.length} suggestions. Return a complete JSON array with exactly ${minCount}-15 unique suggestions. Include summary rewrite + experience rewrites.`,
         temperature: 0.35,
-        maxTokens: 8192,
+        maxTokens: 2048,
       });
       if (!retry?.content) continue;
       const retried = parseSuggestionsFromLlm(retry.content);
@@ -316,14 +325,15 @@ export async function POST(req: NextRequest) {
     const llmCount = suggestions.length;
 
     const rewriteCount = countRewrites(suggestions);
-    if (rewriteCount === 0 && enhancedMissing.length > 0) {
+    const skipMissingRetry = rewriteCount >= 8;
+    if (!skipMissingRetry && rewriteCount === 0 && enhancedMissing.length > 0) {
       suggestions = await retryMissingViaLlm(
         suggestions,
         enhancedMissing,
         resumeText,
         structureContext
       );
-    } else if (uncoveredKeywords(suggestions, enhancedMissing).length > 0) {
+    } else if (!skipMissingRetry && uncoveredKeywords(suggestions, enhancedMissing).length > 0) {
       suggestions = await retryMissingViaLlm(
         suggestions,
         enhancedMissing,
@@ -344,13 +354,13 @@ export async function POST(req: NextRequest) {
       formatted = validateTailorSuggestions(formatted, structuredResume as StructuredResume);
     }
 
-    if (formatted.length < minCount && structuredResume) {
+    if (formatted.length < minCount && formatted.length < 8 && structuredResume) {
       const need = minCount - formatted.length;
       const fill = await chatForTailor({
         system: systemPrompt,
         user: `${userPrompt}\n\nAfter validation only ${formatted.length} suggestions remain. Return a JSON array with exactly ${need} NEW suggestions targeting different bulletIndex values not yet covered. No duplicate bulletIndex.`,
         temperature: 0.3,
-        maxTokens: 4096,
+        maxTokens: 2048,
       });
       if (fill?.content) {
         const extraRaw = parseSuggestionsFromLlm(fill.content);

@@ -30,6 +30,9 @@ import { useFluxFlag } from "@/hooks/useFeatureFlag";
 type WizardStep = "tailor" | "template" | "download";
 type Intensity = "low" | "medium" | "high";
 
+/** Skip LLM resume parse when regex/cache parse is already good enough. */
+const PARSE_QUALITY_THRESHOLD = 65;
+
 function pickBestParse(...candidates: (StructuredResume | null | undefined)[]): StructuredResume | null {
   let best: StructuredResume | null = null;
   let bestScore = -1;
@@ -245,12 +248,7 @@ function TailorContent() {
           try { nerConverted = nerToStructuredResume(data.context.resume.structuredData); } catch {}
         }
 
-        const llmPromise =
-          rawText && rawText.length > 50 ? llmParseResume(rawText) : Promise.resolve(null);
-
         let structured = pickBestParse(nerConverted, regexParsed, cachedStructured);
-        const llmParsed = await llmPromise;
-        structured = pickBestParse(llmParsed, structured);
         if (!structured && cachedStructured) structured = cachedStructured;
 
         setResume(structured);
@@ -260,20 +258,48 @@ function TailorContent() {
           rescoreFull(structured).catch(() => {});
         }
 
-        if (structured && jd) {
-          const llmSugg = await generateLLMSuggestions(
-            structured, jd, data, gapMissing, gapMatched
-          );
-          if (llmSugg && llmSugg.length > 0) {
-            setSuggestions(llmSugg);
-          } else {
-            const fallback = buildSuggestions(structured, gapMissing, []);
-            setSuggestions(fallback);
-          }
+        // Show page immediately — suggestions load in background
+        setLoading(false);
+
+        const needsLlmParse =
+          !!rawText &&
+          rawText.length > 50 &&
+          (!structured || scoreParseQuality(structured) < PARSE_QUALITY_THRESHOLD);
+
+        if (needsLlmParse) {
+          llmParseResume(rawText).then((llmParsed) => {
+            if (!llmParsed) return;
+            const improved = pickBestParse(llmParsed, structured);
+            const baseQuality = structured ? scoreParseQuality(structured) : 0;
+            if (improved && scoreParseQuality(improved) > baseQuality) {
+              setResume(improved);
+              setOriginalResume(JSON.parse(JSON.stringify(improved)));
+              if (jd) rescoreFull(improved).catch(() => {});
+              if (draftId) {
+                api.drafts.saveState(draftId, {
+                  structuredResume: improved,
+                  aiSuggestions: [],
+                  currentScore: data.currentAtsScore ?? 0,
+                }).catch(() => {});
+              }
+            }
+          });
         }
 
-        // Persist improved structured resume
-        if (structured && draftId) {
+        if (structured && jd) {
+          generateLLMSuggestions(structured, jd, data, gapMissing, gapMatched).then(
+            (llmSugg) => {
+              if (llmSugg && llmSugg.length > 0) {
+                setSuggestions(llmSugg);
+              } else {
+                const fallback = buildSuggestions(structured!, gapMissing, []);
+                setSuggestions(fallback);
+              }
+            }
+          );
+        }
+
+        if (structured && draftId && !needsLlmParse) {
           api.drafts.saveState(draftId, {
             structuredResume: structured,
             aiSuggestions: [],

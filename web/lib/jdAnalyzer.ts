@@ -98,7 +98,7 @@ export async function analyzeJobDescription(
       system: JD_SYSTEM_PROMPT,
       user: `Job Title: ${jobTitle || "Unknown"}\n\nJob Description:\n${jdText.slice(0, 8000)}`,
       temperature: 0.1,
-      maxTokens: 2048,
+      maxTokens: 1024,
     });
 
     if (result?.content) {
@@ -142,6 +142,11 @@ export function extractRegexKeywords(jdText: string, jobTitle?: string): string[
     ...analysis.keywords,
     ...analysis.softSkills,
   ]);
+}
+
+/** Sync regex-only JD extraction — instant, used when extension already provided keywords. */
+export function analyzeJobDescriptionFast(jdText: string, jobTitle?: string): JDAnalysis {
+  return regexFallback(jdText, jobTitle);
 }
 
 function regexFallback(jdText: string, jobTitle?: string): JDAnalysis {

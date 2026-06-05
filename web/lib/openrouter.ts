@@ -8,15 +8,17 @@ export function isOpenRouterConfigured(): boolean {
   return !!OPENROUTER_KEY;
 }
 
-/** Fast OpenRouter models — mini first (benchmarked faster), nano second. */
+/** General OpenRouter models — mini default for optimize/parse. */
 export function getOpenRouterModels(): string[] {
   const primary = process.env.LLM_MODEL || "openai/gpt-5.4-mini";
   return [...new Set([primary, "openai/gpt-5.4-mini", "openai/gpt-5.4-nano"].filter(Boolean))];
 }
 
-/** Tailor + JD parsing — same fast OpenRouter chain as general LLM (no Claude required). */
+/** Tailor + JD parsing — nano-first for speed; mini fallback for quality. */
 export function getTailorModels(): string[] {
-  return getOpenRouterModels();
+  const tailorPrimary =
+    process.env.TAILOR_LLM_MODEL || process.env.LLM_MODEL || "openai/gpt-5.4-nano";
+  return [...new Set([tailorPrimary, "openai/gpt-5.4-nano", "openai/gpt-5.4-mini"].filter(Boolean))];
 }
 
 export async function openRouterChat(params: {
