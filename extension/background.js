@@ -90,9 +90,6 @@ async function injectContentScripts(tabId, url) {
   if (source) {
     scripts.push("content/" + source + ".js");
   }
-  if (/linkedin\.com/i.test(url || "")) {
-    scripts.push("content/linkedin-profile.js");
-  }
   scripts.push("content/sidebar.js");
 
   await chrome.scripting.executeScript({

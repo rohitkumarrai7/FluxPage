@@ -15,8 +15,8 @@
     "offscreen"
   ],
   "host_permissions": [
-    "http://localhost:8000/*",
-    "http://localhost:3000/*",
+    "https://www.fluxpage.com/*",
+    "https://fluxpage.com/*",
     "https://*.convex.site/*",
     "https://*.convex.cloud/*",
     "https://us.i.posthog.com/*",
@@ -35,7 +35,7 @@
     "service_worker": "background.js"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' http://localhost:8000 http://localhost:3000 https://*.convex.site https://*.convex.cloud https://unpkg.com https://us.i.posthog.com"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://www.fluxpage.com https://fluxpage.com https://*.convex.site https://*.convex.cloud https://unpkg.com https://us.i.posthog.com"
   },
   "content_scripts": [
     {
@@ -60,7 +60,6 @@
       "js": [
         "config.generated.js",
         "content/linkedin.js",
-        "content/linkedin-profile.js",
         "content/sidebar.js"
       ],
       "run_at": "document_idle"

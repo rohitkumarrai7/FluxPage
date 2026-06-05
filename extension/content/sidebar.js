@@ -89,7 +89,7 @@
     var container = document.createElement("div");
     container.id = "resumod-sidebar";
     container.setAttribute("style",
-      "position: fixed; top: 0; right: 0; width: " + sidebarWidth + "px; max-width: 100vw; height: 100vh; height: 100dvh; background: rgba(248,250,252,0.96); box-shadow: -8px 0 32px rgba(15,23,42,0.12); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; transition: transform 0.32s cubic-bezier(0.4,0,0.2,1); transform: translateX(0); pointer-events: auto; z-index: 1000000;"
+      "position: fixed; top: 0; right: 0; width: " + sidebarWidth + "px; max-width: 100vw; height: 100vh; height: 100dvh; background: #ffffff; box-shadow: -4px 0 24px rgba(15,23,42,0.08); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; transition: transform 0.32s cubic-bezier(0.4,0,0.2,1); transform: translateX(0); pointer-events: auto; z-index: 1000000;"
     );
     shadowRoot.appendChild(container);
     sidebarEl = container;
@@ -104,7 +104,6 @@
     loadSettingsIntoUI();
     updateSourceBadge();
     loadSavedJobs();
-    updateLinkedInPanel();
     autoFillJobData();
     autoFillJdTextarea();
     restoreActiveTab();
@@ -169,8 +168,6 @@
       });
     });
 
-    $("#optimizeProfileBtn").addEventListener("click", onOptimizeProfile);
-
     chrome.storage.onChanged.addListener(function (changes, area) {
       if (area !== "local") return;
       if (changes[STORAGE.resumes]) refreshResumes();
@@ -195,9 +192,9 @@
 
   function restoreActiveTab() {
     chrome.storage.local.get([STORAGE.activeTab], function (result) {
-      if (result[STORAGE.activeTab]) {
-        switchTab(result[STORAGE.activeTab]);
-      }
+      var tab = result[STORAGE.activeTab];
+      if (tab === "linkedin") tab = "ats";
+      if (tab === "save" || tab === "ats") switchTab(tab);
     });
   }
 
@@ -1332,149 +1329,6 @@ function basicPdfTextExtraction(base64Data) {
     }
   }
 
-  // -- LinkedIn Optimization -------------------------------------------
-
-  function updateLinkedInPanel() {
-    var isProfile = window.ResumodLinkedInProfile && window.ResumodLinkedInProfile.isLinkedInProfile();
-    var stateEl = $("#linkedinState");
-    var contentEl = $("#linkedinContent");
-
-    if (isProfile) {
-      stateEl.hidden = true;
-      contentEl.hidden = false;
-      showProfileSections();
-    } else {
-      stateEl.hidden = false;
-      contentEl.hidden = true;
-      var hint = $("#linkedinHint");
-      if (/linkedin\.com/i.test(location.href)) {
-        hint.textContent = "Navigate to a profile page (linkedin.com/in/...) to use optimization tools.";
-      } else {
-        hint.textContent = "Open a LinkedIn profile page to use optimization tools.";
-      }
-    }
-  }
-
-  function showProfileSections() {
-    if (!window.ResumodLinkedInProfile) return;
-    var profile = window.ResumodLinkedInProfile.scrapeProfile();
-    var listEl = $("#profileSectionsList");
-    listEl.innerHTML = "";
-
-    if (profile.sections.length === 0) {
-      listEl.innerHTML = '<div class="hint">No profile sections detected. Make sure the profile is fully loaded.</div>';
-      return;
-    }
-
-    profile.sections.forEach(function (sec) {
-      var div = document.createElement("div");
-      div.className = "profile-section-item";
-      div.innerHTML =
-        '<div class="profile-section-label">' + escHtml(sec.label) + '</div>' +
-        '<div class="profile-section-preview">' + escHtml(sec.text.slice(0, 120)) + (sec.text.length > 120 ? "…" : "") + '</div>';
-      listEl.appendChild(div);
-    });
-  }
-
-  async function onOptimizeProfile() {
-    hideError();
-    if (!window.ResumodLinkedInProfile) return;
-
-    var btn = $("#optimizeProfileBtn");
-    btn.disabled = true;
-    btn.classList.add("loading");
-    btn.textContent = "Analyzing profile…";
-
-    try {
-      var profile = window.ResumodLinkedInProfile.scrapeProfile();
-      if (profile.sections.length === 0) {
-        throw new Error("No profile sections detected. Scroll down to load all sections and try again.");
-      }
-
-      var resp = await sendRuntime({
-        type: "OPTIMIZE_LINKEDIN",
-        payload: {
-          profileUrl: profile.url,
-          sections: profile.sections.map(function (s) { return { name: s.name, text: s.text }; })
-        }
-      });
-      if (!resp.ok) throw new Error(resp.error);
-
-      renderLinkedInResults(resp.data);
-    } catch (err) {
-      showError(err.message || String(err));
-    } finally {
-      btn.disabled = false;
-      btn.classList.remove("loading");
-      btn.textContent = "Analyze Profile";
-    }
-  }
-
-  function renderLinkedInResults(data) {
-    var resultsEl = $("#linkedinResults");
-    var accordionEl = $("#linkedinAccordion");
-    resultsEl.hidden = false;
-    accordionEl.innerHTML = "";
-
-    var suggestions = data.suggestions || [];
-    if (suggestions.length === 0) {
-      accordionEl.innerHTML = '<div class="hint">No suggestions available.</div>';
-      return;
-    }
-
-    var bySection = {};
-    suggestions.forEach(function (s) {
-      var key = s.section || "general";
-      if (!bySection[key]) bySection[key] = [];
-      bySection[key].push(s);
-    });
-
-    Object.keys(bySection).forEach(function (sectionName) {
-      var items = bySection[sectionName];
-      var sectionDiv = document.createElement("div");
-      sectionDiv.className = "accordion-section";
-
-      var header = document.createElement("div");
-      header.className = "accordion-header";
-      header.innerHTML =
-        '<span>' + escHtml(capitalize(sectionName)) + ' (' + items.length + ' tips)</span>' +
-        '<span class="chev">▾</span>';
-
-      var body = document.createElement("div");
-      body.className = "accordion-body";
-
-      items.forEach(function (item) {
-        var tipDiv = document.createElement("div");
-        tipDiv.className = "tip-item";
-        var priorityClass = (item.priority || "").toLowerCase() === "high" ? "priority-high" :
-                            (item.priority || "").toLowerCase() === "medium" ? "priority-medium" : "priority-low";
-        tipDiv.innerHTML =
-          '<div class="tip-header">' +
-            '<span class="priority-badge ' + priorityClass + '">' + escHtml(item.priority || "Low") + '</span>' +
-            '<button class="btn btn-text btn-sm btn-copy-tip" title="Copy">Copy</button>' +
-          '</div>' +
-          '<div class="tip-text">' + escHtml(item.tip || "") + '</div>' +
-          (item.originalText ? '<div class="tip-original">Original: ' + escHtml(item.originalText.slice(0, 150)) + (item.originalText.length > 150 ? "…" : "") + '</div>' : '');
-        body.appendChild(tipDiv);
-
-        tipDiv.querySelector(".btn-copy-tip").addEventListener("click", function () {
-          navigator.clipboard.writeText(item.tip || "").then(function () {
-            flash("Copied to clipboard!");
-          }).catch(function () {});
-        });
-      });
-
-      header.addEventListener("click", function () {
-        body.classList.toggle("open");
-        header.classList.toggle("open");
-      });
-
-      sectionDiv.appendChild(header);
-      sectionDiv.appendChild(body);
-      accordionEl.appendChild(sectionDiv);
-    });
-  }
-
   // -- Auth ------------------------------------------------------------
 
   var userPlan = { tier: "free", usage: null };
@@ -1654,9 +1508,8 @@ function basicPdfTextExtraction(base64Data) {
         '<div class="header-left">' +
           '<img class="app-icon" src="__LOGO_URL__" alt="Fluxpage" />' +
           '<div class="header-titles">' +
-             '<div class="app-title">Fluxpage</div>' +
-            '<div class="app-sub">AI Job Assistant</div>' +
-            '<a class="ceo-credit" href="https://ceo.agency/" target="_blank" rel="noopener noreferrer" title="CEO.AGENCY — AI agency for growing businesses">A product by CEO.AGENCY</a>' +
+            '<div class="app-title">Fluxpage</div>' +
+            '<div class="app-sub">AI job assistant</div>' +
           '</div>' +
           '<span class="src-badge" id="sourceBadge">\u2014</span>' +
         '</div>' +
@@ -1667,9 +1520,10 @@ function basicPdfTextExtraction(base64Data) {
       '</div>' +
 
       '<div class="tab-bar">' +
-        '<button class="tab-btn active" data-tab="save">Save Job</button>' +
-        '<button class="tab-btn" data-tab="ats">Resume Fit</button>' +
-        '<button class="tab-btn" data-tab="linkedin">LinkedIn</button>' +
+        '<div class="tab-segment">' +
+          '<button class="tab-btn active" data-tab="save">Save Job</button>' +
+          '<button class="tab-btn" data-tab="ats">ATS Match</button>' +
+        '</div>' +
       '</div>' +
 
       '<div class="container tab-panel active" id="panel-save">' +
@@ -1733,11 +1587,11 @@ function basicPdfTextExtraction(base64Data) {
           '<textarea id="manualJd" rows="5" placeholder="Paste the job description here if auto-scrape fails..." style="width:100%;padding:7px 10px;font-size:12px;font-family:inherit;border:1px solid rgba(15,23,42,0.14);border-radius:6px;resize:vertical;min-height:60px;background:#fff;"></textarea>' +
         '</div>' +
 
-        '<div class="card">' +
+        '<div class="card cta-card">' +
           '<button class="start-btn" id="analyzeBtn" disabled>' +
-            '<span class="btn-label">Analyze this Job</span>' +
+            '<span class="btn-label">Check ATS Score</span>' +
           '</button>' +
-          '<div class="hint" id="tipLine">Upload a resume and provide a job description to analyze your fit.</div>' +
+          '<div class="hint" id="tipLine">Select a resume and paste the job description to see your match score.</div>' +
         '</div>' +
 
         '<div class="card results" id="results" hidden>' +
@@ -1789,25 +1643,6 @@ function basicPdfTextExtraction(base64Data) {
         '</section>' +
       '</div>' +
 
-      '<div class="container tab-panel" id="panel-linkedin">' +
-        '<div id="linkedinState">' +
-          '<div class="card">' +
-            '<div class="hint" id="linkedinHint">Open a LinkedIn profile page to use optimization tools.</div>' +
-          '</div>' +
-        '</div>' +
-        '<div id="linkedinContent" hidden>' +
-          '<div class="card">' +
-            '<div class="section-title">Profile Sections Detected</div>' +
-            '<div id="profileSectionsList" class="profile-sections-list"></div>' +
-            '<button class="start-btn" id="optimizeProfileBtn"><span class="btn-label">Analyze Profile</span></button>' +
-          '</div>' +
-          '<div class="card" id="linkedinResults" hidden>' +
-            '<div class="section-title">Optimization Suggestions</div>' +
-            '<div id="linkedinAccordion" class="accordion"></div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-
       '<div class="error-banner" id="errorBanner" hidden></div>' +
 
       '<div class="ceo-footer">' +
@@ -1843,56 +1678,38 @@ function basicPdfTextExtraction(base64Data) {
 
       '.window-frame {' +
         'height: 100vh;' +
-        'background: rgba(244, 247, 252, 0.85);' +
-        'backdrop-filter: blur(22px);' +
-        '-webkit-backdrop-filter: blur(22px);' +
-        'border-left: 1px solid rgba(255, 255, 255, 0.5);' +
-        'box-shadow: 0 8px 32px rgba(15, 23, 42, 0.15);' +
+        'height: 100dvh;' +
+        'background: #f8fafc;' +
+        'border-left: 1px solid #e2e8f0;' +
         'position: relative;' +
         'display: flex;' +
         'flex-direction: column;' +
       '}' +
 
-      '.glass-accent {' +
-        'position: absolute; inset: 0;' +
-        'background: linear-gradient(135deg, rgba(3, 105, 161, 0.06) 0%, transparent 50%, rgba(124, 58, 237, 0.04) 100%);' +
-        'pointer-events: none;' +
-      '}' +
+      '.glass-accent { display: none; }' +
 
       '.header {' +
         'background: #ffffff;' +
-        'color: #0b1220;' +
-        'padding: 14px 16px;' +
+        'color: #0f172a;' +
+        'padding: 12px 14px;' +
         'display: flex;' +
         'align-items: center;' +
         'justify-content: space-between;' +
-        'position: relative;' +
         'flex-shrink: 0;' +
-        'border-bottom: 1px solid rgba(15, 23, 42, 0.08);' +
+        'border-bottom: 1px solid #e2e8f0;' +
       '}' +
-      '.header::after {' +
-        'content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;' +
-        'background: linear-gradient(90deg, transparent, rgba(3, 105, 161, 0.25), transparent);' +
-      '}' +
-      '.header-left { display: flex; align-items: center; gap: 10px; }' +
+      '.header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }' +
       '.app-icon {' +
-        'width: 36px; height: 36px; border-radius: 10px;' +
+        'width: 32px; height: 32px; border-radius: 8px;' +
         'display: block; flex-shrink: 0;' +
-        'box-shadow: 0 4px 12px rgba(3, 105, 161, 0.22);' +
       '}' +
-      '.header-titles { line-height: 1.1; }' +
-      '.ceo-credit {' +
-        'display: block; margin-top: 3px; font-size: 9px; color: #64748b;' +
-        'text-decoration: none; font-weight: 500; letter-spacing: 0.01em;' +
-      '}' +
-      '.ceo-credit:hover { color: #0369a1; text-decoration: underline; }' +
-      '.ceo-credit strong { font-weight: 700; color: #334155; }' +
-      '.app-title { font-size: 14px; font-weight: 600; color: #0b1220; }' +
-      '.app-sub { font-size: 10px; color: #64748b; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }' +
+      '.header-titles { line-height: 1.2; min-width: 0; }' +
+      '.app-title { font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; }' +
+      '.app-sub { font-size: 11px; color: #64748b; margin-top: 1px; }' +
       '.src-badge {' +
-        'margin-left: 8px; font-size: 9px; font-weight: 700; letter-spacing: 0.08em;' +
-        'padding: 3px 7px; border-radius: 999px;' +
-        'background: rgba(3, 105, 161, 0.1); color: #0369a1; border: 1px solid rgba(3, 105, 161, 0.2);' +
+        'margin-left: auto; font-size: 9px; font-weight: 700; letter-spacing: 0.06em;' +
+        'padding: 3px 8px; border-radius: 999px;' +
+        'background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; flex-shrink: 0;' +
       '}' +
 
       '.window-controls { display: flex; align-items: center; gap: 8px; }' +
@@ -1905,22 +1722,28 @@ function basicPdfTextExtraction(base64Data) {
       '.control-btn:hover { transform: scale(1.12); opacity: 0.9; }' +
 
       '.tab-bar {' +
-        'display: flex; gap: 6px; padding: 10px 12px 0;' +
-        'background: rgba(255,255,255,0.85); border-bottom: 1px solid rgba(15,23,42,0.06);' +
+        'padding: 12px 14px;' +
+        'background: #ffffff;' +
+        'border-bottom: 1px solid #e2e8f0;' +
         'flex-shrink: 0;' +
       '}' +
+      '.tab-segment {' +
+        'display: flex; gap: 4px; padding: 4px;' +
+        'background: #f1f5f9; border-radius: 10px;' +
+        'border: 1px solid #e2e8f0;' +
+      '}' +
       '.tab-btn {' +
-        'flex: 1; padding: 8px 10px; border: none; background: #f1f5f9;' +
-        'font-size: 11px; font-weight: 600; color: #64748b; cursor: pointer;' +
-        'font-family: inherit; border-radius: 8px 8px 0 0;' +
+        'flex: 1; padding: 9px 12px; border: none; background: transparent;' +
+        'font-size: 12px; font-weight: 600; color: #64748b; cursor: pointer;' +
+        'font-family: inherit; border-radius: 7px;' +
         'transition: color 0.15s, background 0.15s, box-shadow 0.15s;' +
       '}' +
-      '.tab-btn:hover { color: #0369a1; background: #e0f2fe; }' +
-      '.tab-btn.active { color: #fff; background: linear-gradient(135deg, #0369a1 0%, #0d9488 100%); box-shadow: 0 2px 8px rgba(3,105,161,0.25); }' +
+      '.tab-btn:hover { color: #4338ca; }' +
+      '.tab-btn.active { color: #0f172a; background: #ffffff; box-shadow: 0 1px 3px rgba(15,23,42,0.08); }' +
 
       '.container {' +
         'flex: 1; overflow-y: auto; padding: 14px;' +
-        'scrollbar-width: thin; background: rgba(244, 247, 252, 0.35);' +
+        'scrollbar-width: thin; background: #f8fafc;' +
         'display: none;' +
       '}' +
       '.container::-webkit-scrollbar { width: 6px; }' +
@@ -1928,16 +1751,12 @@ function basicPdfTextExtraction(base64Data) {
       '.tab-panel.active { display: block; }' +
 
       '.card {' +
-        'background: rgba(255, 255, 255, 0.94);' +
-        'backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);' +
-        'border: 1px solid rgba(255, 255, 255, 0.6);' +
-        'border-radius: 10px; padding: 14px; margin-bottom: 12px;' +
-        'box-shadow: 0 4px 18px rgba(15, 23, 42, 0.07); position: relative;' +
+        'background: #ffffff;' +
+        'border: 1px solid #e2e8f0;' +
+        'border-radius: 12px; padding: 14px; margin-bottom: 10px;' +
+        'box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);' +
       '}' +
-      '.card::before {' +
-        'content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;' +
-        'background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);' +
-      '}' +
+      '.cta-card { border-color: #c7d2fe; background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%); }' +
 
       '.section-title {' +
         'font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 10px;' +
@@ -1955,8 +1774,8 @@ function basicPdfTextExtraction(base64Data) {
       '.fld textarea { resize: vertical; min-height: 60px; }' +
       '.fld select { cursor: pointer; }' +
       '.fld input:focus, .fld textarea:focus, .fld select:focus {' +
-        'outline: none; border-color: #0369a1;' +
-        'box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.12);' +
+        'outline: none; border-color: #6366f1;' +
+        'box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);' +
       '}' +
       '.fld input[readonly] { background: #f1f5f9; color: #64748b; }' +
 
@@ -1967,13 +1786,13 @@ function basicPdfTextExtraction(base64Data) {
         'transition: transform 0.15s, box-shadow 0.15s, background 0.15s;' +
       '}' +
       '.btn-primary {' +
-        'background: linear-gradient(135deg, #0369a1 0%, #0d9488 100%);' +
-        'color: #fff; box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28);' +
+        'background: #4f46e5;' +
+        'color: #fff; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);' +
       '}' +
-      '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(13, 148, 136, 0.35); filter: brightness(1.05); }' +
+      '.btn-primary:hover { transform: translateY(-1px); background: #4338ca; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35); }' +
       '.btn-outline { background: #fff; color: #0f172a; border: 1px solid rgba(15, 23, 42, 0.14); }' +
       '.btn-outline:hover { background: #f1f5f9; }' +
-      '.btn-text { background: none; color: #0369a1; padding: 4px 8px; }' +
+      '.btn-text { background: none; color: #4f46e5; padding: 4px 8px; }' +
       '.btn-text:hover { text-decoration: underline; }' +
       '.btn-sm { padding: 4px 10px; font-size: 11px; }' +
       '.full-width { width: 100%; margin-top: 14px; }' +
@@ -1981,12 +1800,12 @@ function basicPdfTextExtraction(base64Data) {
       '.start-btn {' +
         'width: 100%; padding: 14px 16px; border: none; border-radius: 10px;' +
         'font-size: 14px; font-weight: 700; font-family: inherit;' +
-        'background: linear-gradient(135deg, #0369a1 0%, #059669 100%);' +
+        'background: #4f46e5;' +
         'color: #fff; cursor: pointer;' +
-        'box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);' +
-        'transition: transform 0.15s, box-shadow 0.15s, filter 0.2s;' +
+        'box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);' +
+        'transition: transform 0.15s, box-shadow 0.15s, background 0.2s;' +
       '}' +
-      '.start-btn:hover:not([disabled]) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(5, 150, 105, 0.45); filter: brightness(1.06); }' +
+      '.start-btn:hover:not([disabled]) { transform: translateY(-1px); background: #4338ca; box-shadow: 0 6px 18px rgba(79, 70, 229, 0.45); }' +
       '.start-btn[disabled] { background: #cbd5e1; color: #fff; cursor: not-allowed; box-shadow: none; }' +
       '.start-btn.loading { background: #6b7280; }' +
       '.start-btn.loading::after {' +
@@ -2035,7 +1854,7 @@ function basicPdfTextExtraction(base64Data) {
       '.score-wrap { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }' +
       '.score-ring {' +
         'width: 96px; height: 96px; border-radius: 50%;' +
-        'background: conic-gradient(#0369a1 0deg, rgba(3, 105, 161, 0.12) 0);' +
+        'background: conic-gradient(#4f46e5 0deg, rgba(79, 70, 229, 0.12) 0);' +
         'display: grid; place-items: center; position: relative; flex-shrink: 0;' +
       '}' +
       '.score-inner {' +
@@ -2059,7 +1878,7 @@ function basicPdfTextExtraction(base64Data) {
 
       '.sug-list { list-style: none; padding: 0; margin: 0; }' +
       '.sug-list li { font-size: 12px; line-height: 1.5; color: #334155; padding: 6px 0 6px 20px; position: relative; }' +
-      '.sug-list li::before { content: "\u2192"; position: absolute; left: 0; top: 6px; color: #0369a1; font-weight: 700; }' +
+      '.sug-list li::before { content: "\u2192"; position: absolute; left: 0; top: 6px; color: #4f46e5; font-weight: 700; }' +
 
       '.save-status {' +
         'margin-top: 8px; padding: 6px 10px; border-radius: 6px;' +
@@ -2192,9 +2011,9 @@ function basicPdfTextExtraction(base64Data) {
         'width: 52px !important; height: 52px !important;' +
         'top: auto !important; bottom: 24px !important; right: 16px !important;' +
         'border-radius: 50% !important; overflow: hidden !important;' +
-        'background: linear-gradient(135deg, #0369a1 0%, #059669 100%) !important;' +
+        'background: #4f46e5 !important;' +
         'cursor: pointer !important;' +
-        'box-shadow: 0 8px 24px rgba(5, 150, 105, 0.45) !important;' +
+        'box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4) !important;' +
       '}' +
       '#resumod-sidebar.minimized .window-frame { display: none; }' +
       '#resumod-sidebar.minimized::before {' +
